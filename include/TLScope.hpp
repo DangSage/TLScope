@@ -20,9 +20,16 @@ public:
     // run the TLScope
     void run();
 
+    // save user data to a file
+    bool saveUserData(std::shared_ptr<USER> user);
+
+    // register a new user
+    bool registerUser();
+
     // get user data in a formatted tree
     void getUserData();
 private:
+    bool newUser = false;
     std::shared_ptr<USER> user;
     std::map<std::string, std::shared_ptr<USER>> registered_users;
     std::map<std::string, std::shared_ptr<USER>> online_users;

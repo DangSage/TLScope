@@ -7,11 +7,8 @@
 #include <map>
 
 TLScope::TLScope(): user(std::make_shared<USER>()) {
-    user->name = "username";
-    user->email = "user@email.com";
-    user->hashedPassword = "password";
-    user->color = 0x000000;
-    user->uuid = "00000000-0000-0000-0000-000000000000";
+    registered_users = buildRegisteredUsers();
+    newUser = registered_users.empty();
 }
 
 TLScope::TLScope(const std::string &name) {
@@ -21,7 +18,34 @@ TLScope::TLScope(const std::string &name) {
 
 void TLScope::run() {
     std::cout << "Running TLScope..." << std::endl;
-    std::cout << TLSS_C::TITLE_ART << std::endl;
+    std::cout << TLSS_C::TITLE_ART << "\033[1A\r     " << "Version: "
+        << TLSS_C::VERSION << "  Author: " << TLSS_C::AUTHOR << std::endl
+        << "     GNU General Public License v3.0 - 2021";
+
+    std::cout << std::endl << std::endl;
+    if (newUser) { std::cout << "No users registered. Please register a new user.\n" << std::endl; }
+
+    std::cout << " r. Register" << std::endl;
+    if (!newUser) { std::cout << " l. Login" << std::endl; }
+    std::cout << " q. Quit" << std::endl;
+    std::cout << "─────────────────────────────────────────────" << std::endl;
+
+    char input;
+    while (true) {
+        std::cout << ">";
+        std::cin >> input;
+        if (input == 'q') {
+            break;
+        } else if (input == 'l') {
+            break;
+        } else if (input == 'r') {
+            registerUser();
+            break;
+        } else {
+            std::cout << "Invalid input!" << std::endl;
+        }
+    }
+    std::cout << "Quitting..." << std::endl;
 }
 
 void TLScope::getUserData() {
@@ -29,8 +53,6 @@ void TLScope::getUserData() {
     TLSS_U::display_list(std::map<std::string, std::any> {
         {"name", user->name},
         {"email", user->email},
-        {"hashedPassword", user->hashedPassword},
-        {"color", std::to_string(user->color)},
         {"uuid", user->uuid}
     });
 }

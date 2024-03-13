@@ -6,6 +6,8 @@
 #include <boost/serialization/vector.hpp>
 #include <fstream>
 #include <string>
+#include <map>
+#include <memory>
 #include <vector>
 
 // user class for the user data
@@ -30,5 +32,13 @@ struct USER {
         ar & uuid;
     }
 };
+
+// build list of registered users on file, attached by uuid
+std::map<std::string, std::shared_ptr<USER>> buildRegisteredUsers();
+
+// load user data from a file
+std::shared_ptr<USER> loadUserData(const std::string& uuid);
+
+// load user data from a file
 
 #endif // _TLSS_USER_HPP_4204

@@ -88,6 +88,9 @@ namespace _rand {
 
     // generate a random seed integer
     extern size_t seed();
+
+    // generate a random salt
+    std::string generate_salt(size_t length);
 }  // namespace _rand
 
 #endif // _TLSS_UTILS_HPP_4204

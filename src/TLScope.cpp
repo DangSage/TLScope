@@ -1,6 +1,9 @@
 #include "TLScope.hpp"
 #include "user.hpp"
 #include "_utils.hpp"
+#include "_constants.hpp"
+#include <iostream>
+#include <string>
 #include <map>
 
 TLScope::TLScope(): user(std::make_shared<USER>()) {
@@ -18,7 +21,7 @@ TLScope::TLScope(const std::string &name) {
 
 void TLScope::run() {
     std::cout << "Running TLScope..." << std::endl;
-    std::cout << "User: " << user->name << std::endl;
+    std::cout << TLSS_C::TITLE_ART << std::endl;
 }
 
 void TLScope::getUserData() {

@@ -4,6 +4,6 @@
 
 int main() {
     TLScope ts;
-    ts.getUserData();
+    ts.run();
     return 0;
 }

@@ -1,5 +1,5 @@
 // Utility header file for general manipulation of data
-// * will contain general utility functions for data manipulation
+// * included serialization, rng, cryptography, and other general data manipulation
 #ifndef _TLSS_UTILS_HPP_4204
 #define _TLSS_UTILS_HPP_4204
 
@@ -13,6 +13,35 @@
 namespace TLSS_U {
     // display a list of items in a map
     std::string display_list(std::map<std::string, std::any> data_dict, std::string prefix="");
+
+    // salt and hash a piece of data using SHA256
+    // * returns a pair of strings: the salt and the hashed data
+    std::pair<std::string, std::string> hash(const std::string& data);
+
+    // verify a piece of data using a salt and a hash
+    extern bool check_hash(const std::string& data, const std::string& salt, const std::string& hash);
+
+    // generate a key pair for RSA encryption
+    extern std::pair<std::string, std::string> generate_key_pair();
+
+    // encrypt a file
+    // * Step 1: Encrypt the file
+    // * Step 2: Encrypt the symmetric key
+    // encrypted_file_info = {
+    //     'encrypted_key': base64.b64encode(encrypted_key).decode(),
+    //     'nonce': base64.b64encode(cipher_aes.nonce).decode(),
+    //     'tag': base64.b64encode(tag).decode(),
+    //     'ciphertext': base64.b64encode(ciphertext).decode(),
+    // }
+    extern std::map<std::string, std::string> encrypt_file(
+        const std::string& file_path, const std::string& public_key);
+
+    // decrypt a file
+    // * Step 1: Decrypt the symmetric key
+    // * Step 2: Decrypt the file
+    extern void decrypt_file(
+        std::map<std::string, std::string> encrypted_file_info);
+
 }
 
 namespace _rand {

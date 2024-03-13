@@ -1,5 +1,5 @@
-// network header: network class and methods
-
+// Network header: network class and methods
+// * will contain all network related classes and methods
 #ifndef _TLSS_NETWORK_HPP_4204
 #define _TLSS_NETWORK_HPP_4204
 

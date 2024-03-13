@@ -1,4 +1,5 @@
-// Purpose: Header file for the TLScope class.
+// Header file for the TLScope class.
+// * Main wrapper for the entire program
 #ifndef _TLSS_MAIN_HPP_4204
 #define _TLSS_MAIN_HPP_4204
 

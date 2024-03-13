@@ -1,3 +1,5 @@
+// User data header file
+// * will be used for all users (client and connections)
 #ifndef _TLSS_USER_HPP_4204
 #define _TLSS_USER_HPP_4204
 
@@ -8,6 +10,7 @@
 
 // user class for the user data
 // * Will be used to save and load user data
+// * Will store user data including the main user and users that are online
 struct USER {
     std::string name;
     std::string email;

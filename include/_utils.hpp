@@ -1,3 +1,5 @@
+// Utility header file for general manipulation of data
+// * will contain general utility functions for data manipulation
 #ifndef _TLSS_UTILS_HPP_4204
 #define _TLSS_UTILS_HPP_4204
 

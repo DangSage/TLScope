@@ -1,3 +1,4 @@
+// Constants in TLScope: including strings, maps, and other data types
 #ifndef _TLSS_CONSTANTS_HPP_4204
 #define _TLSS_CONSTANTS_HPP_4204
 

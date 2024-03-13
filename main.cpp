@@ -3,7 +3,7 @@
 #include <iostream>
 
 int main() {
-    TLScope ts("Ethan");
-    ts.run();
+    TLScope ts;
+    ts.getUserData();
     return 0;
 }

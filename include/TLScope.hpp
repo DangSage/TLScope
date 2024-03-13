@@ -1,6 +1,6 @@
 // Purpose: Header file for the TLScope class.
-#ifndef _TS_HEADER_4204
-#define _TS_HEADER_4204
+#ifndef _TLSS_MAIN_HPP_4204
+#define _TLSS_MAIN_HPP_4204
 
 #include <iostream>
 #include <string>
@@ -16,11 +16,15 @@ public:
     TLScope();
     TLScope(const std::string &name);
 
+    // run the TLScope
     void run();
+
+    // get user data in a formatted tree
+    void getUserData();
 private:
     std::shared_ptr<USER> user;
     std::map<std::string, std::shared_ptr<USER>> registered_users;
     std::map<std::string, std::shared_ptr<USER>> online_users;
 };
 
-#endif // _TS_HEADER_04022004
+#endif // _TLSS_MAIN_HPP_4204

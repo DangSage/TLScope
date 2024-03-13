@@ -1,5 +1,5 @@
-#ifndef _TS_USER_HEADER_4204
-#define _TS_USER_HEADER_4204
+#ifndef _TLSS_USER_HPP_4204
+#define _TLSS_USER_HPP_4204
 
 #include <boost/serialization/vector.hpp>
 #include <fstream>
@@ -28,4 +28,4 @@ struct USER {
     }
 };
 
-#endif
+#endif // _TLSS_USER_HPP_4204

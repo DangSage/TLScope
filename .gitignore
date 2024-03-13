@@ -6,4 +6,5 @@
 TLScope
 test
 client_*/
+data/*.tlss
 .vscode/*

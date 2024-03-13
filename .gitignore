@@ -1,6 +1,9 @@
 *.d
 *.o
 ~*
+*.key
+*.crt
 TLScope
 test
+client_*/
 .vscode/*

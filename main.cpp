@@ -1,7 +1,9 @@
-// TLS main.cpp:
+// TLScope main.cpp:
+#include "TLScope.hpp"
 #include <iostream>
 
 int main() {
-    std::cout << "Hello, World!" << std::endl;
+    TLScope ts("Ethan");
+    ts.run();
     return 0;
 }

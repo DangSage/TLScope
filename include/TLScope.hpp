@@ -14,10 +14,7 @@ class USER;
 class TLScope {
 public:
     TLScope();
-    TLScope(const TLScope &rhs);
     TLScope(const std::string &name);
-    ~TLScope();
-    TLScope &operator=(const TLScope &rhs);
 
     void run();
 private:

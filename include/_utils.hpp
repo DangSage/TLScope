@@ -38,6 +38,17 @@ namespace TLSS_U {
 
 }
 
+// namespace for user input checking
+namespace TLSS_I {
+    // prompt+input a email
+    // * regex check for email
+    extern bool validEmail(std::string& email);
+
+    // prompt+input a password
+    // * must be at least 8 characters long
+    extern bool validPassword(std::string& password);
+}
+
 namespace _rand {
     // Declare a random device
     extern std::random_device rd;

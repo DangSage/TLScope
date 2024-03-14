@@ -3,6 +3,8 @@
 #include "user.hpp"
 #include <string>
 #include <sstream>
+#include <iostream>
+#include <regex>
 #include <map>
 #include <any>
 
@@ -32,4 +34,34 @@ std::string TLSS_U::displayList(std::map<std::string, std::any>
     }
     std::cout << ss.str();
     return ss.str();
+}
+
+bool TLSS_I::validEmail(std::string& email) {
+    while (true) {
+        std::cout << "Enter email address  -> ";
+        std::cin >> std::ws;
+        std::getline(std::cin, email);
+        // regex check for email
+        if (std::regex_match(email, std::regex(R"(\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b)"))) {
+            return true;
+        } else if (email == "q") {
+            return false;
+        }
+        std::cerr << "Error: Invalid email address!" << std::endl;
+    }
+}
+
+bool TLSS_I::validPassword(std::string& password) {
+    while (true) {
+        std::cout << "Enter user password  -> ";
+        std::cin >> std::ws;
+        std::getline(std::cin, password);
+        // must be at least 10 characters long
+        if (password.length() >= 10) {
+            return true;
+        } else if (password == "q") {
+            return false;
+        }
+        std::cerr << "Error: Password too short! (<10 characters)" << std::endl;
+    }
 }

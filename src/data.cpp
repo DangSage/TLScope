@@ -7,6 +7,7 @@
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/archive_exception.hpp>
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -53,7 +54,7 @@ std::shared_ptr<USER> loadUserData(const std::string& uuid) {
         boost::archive::binary_iarchive ia(ifs);
         ia >> *user;
     } catch (boost::archive::archive_exception& e) {
-        throw std::runtime_error("Error loading character: " + std::string(e.what()));
+        throw std::runtime_error("Error loading userdata: " + std::string(e.what()));
     }
     
     return user;
@@ -64,15 +65,14 @@ bool TLScope::registerUser() {
         std::cout << "Enter client name    -> ";
         std::cin >> std::ws;
         std::getline(std::cin, user->name);
-        std::cout << "Enter email address  -> ";
-        std::cin >> std::ws;
-        std::getline(std::cin, user->email);
-        std::cout << "Enter user password  -> ";
-        std::cin >> std::ws;
-        std::getline(std::cin, user->hashedPassword);
-        std::cout << "Enter color (in hex) -> ";
-        std::cin >> std::ws >> std::hex >> user->color;
+        if (!TLSS_I::validEmail(user->email)) { return false; }
+        std::string password;
+        if (!TLSS_I::validPassword(password)) { return false; }
+        auto hash = TLSS_U::hash(password); // salt + hash
+        user->hashedPassword = hash.first + "\x1F" + hash.second;
         std::cout << std::endl;
+
+        // std::cout << hash.first << std::endl << hash.second << std::endl;
 
         if (user->name.empty()) {
             std::cerr << "Error: Name cannot be empty!" << std::endl;
@@ -93,8 +93,59 @@ bool TLScope::registerUser() {
     return saveUserData(user);
 }
 
+bool TLScope::loginUser() {
+    std::string email;
+    std::string attempt;
+    while (true) {
+        std::cout << "Enter email address  -> ";
+        std::cin >> std::ws;
+        std::getline(std::cin, email);
+        if (email == "q") { return false; }
+        std::cout << "Enter user password  -> ";
+        std::cin >> std::ws;
+        std::getline(std::cin, attempt);
+        if (attempt == "q") { return false; }
+        std::cout << std::endl;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(_rand::value(0, 1000)));
+        auto it = std::find_if(registered_users.begin(), registered_users.end(), [&](std::pair<std::string, std::shared_ptr<USER>> pair) {
+            return pair.second->email == email;
+        });
+
+        std::string salt;
+        std::string hash;
+        size_t pos = it->second->hashedPassword.find("\x1F");
+
+        // split the hash into salt and hash
+        if (pos != std::string::npos) {
+            salt = it->second->hashedPassword.substr(0, pos);
+            hash = it->second->hashedPassword.substr(pos + 1);
+        }
+
+        // std::cout << salt << std::endl << hash << std::endl;
+
+        if (it == registered_users.end()) {
+            auto dummyHash = TLSS_U::hash("dummypass!");
+            if(!TLSS_U::checkHash(attempt, dummyHash.first, dummyHash.second)) {
+                // nothing to do here, dummyHash is just a placeholder
+            }
+            std::cerr << "Invalid email or password!" << std::endl;
+            continue;
+        }
+
+        if (!TLSS_U::checkHash(attempt, salt, hash)) {
+            std::cerr << "!Invalid email or password!" << std::endl;
+            continue;
+        }
+
+        user = it->second;
+        std::cout << "Welcome, " << user->name << "!" << std::endl;
+        return true;
+    }
+}
+
 std::map<std::string, std::shared_ptr<USER>> buildRegisteredUsers() {
-    std::map<std::string, std::shared_ptr<USER>> list = {};
+    std::map<std::string, std::shared_ptr<USER>> list;
     if (!std::filesystem::exists(TLSS_C::SAVE_DIR)) {
         std::filesystem::create_directory(TLSS_C::SAVE_DIR);
     }

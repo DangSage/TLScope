@@ -40,7 +40,10 @@ std::pair<std::string, std::string> TLSS_U::hash(const std::string& data) {
     // hash the data with the salt
     byte key[SHA256::DIGESTSIZE];
     PKCS5_PBKDF2_HMAC<SHA256> pbkdf;
-    pbkdf.DeriveKey(key, sizeof(key), 0, (byte*)data.data(), data.size(), (byte*)salt.data(), salt.size(), 10000);
+
+    // Derive the key from the data and salt
+    pbkdf.DeriveKey(key, sizeof(key), 0, (byte*)data.data(),
+        data.size(), (byte*)salt.data(), salt.size(), 10000);
 
     // convert the key to a hexadecimal string
     std::string hex_key;

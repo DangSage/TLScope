@@ -28,7 +28,7 @@ void TLScope::run() {
 
     std::cout << " r. Register" << std::endl;
     if (!newUser) { std::cout << " l. Login" << std::endl; }
-    std::cout << " q. Quit" << std::endl;
+    std::cout << " q. Quit (q to quit)" << std::endl;
     std::cout << "─────────────────────────────────────────────" << std::endl;
 
     char input;
@@ -38,6 +38,7 @@ void TLScope::run() {
         if (input == 'q') {
             break;
         } else if (input == 'l') {
+            loginUser();
             break;
         } else if (input == 'r') {
             registerUser();

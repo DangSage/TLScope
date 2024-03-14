@@ -25,6 +25,9 @@ public:
     // register a new user
     bool registerUser();
 
+    // login a user
+    bool loginUser();
+
     // get user data in a formatted tree
     void getUserData();
 private:

@@ -8,6 +8,10 @@ TLScope uses C++ and OpenSSL to visualize TLS connections within a local network
 
 TLScope pings users to build a graph detailing network users. It also provides information about the graph, such as whether it's bipartite, complete, etc.
 
+# Milestones
+- 1) Register and Load Users:
+Includes a registration system that securely stores user data, including salted and hashed passwords, using the Crypto++ library. The Boost's serialization library is used for efficient data storage and retrieval. A login feature authenticates users based on the stored data, performing the inverse of the data storage process to compare.
+
 
 ## Dependencies
 This project depends on the following libraries:

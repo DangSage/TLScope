@@ -16,7 +16,10 @@ public:
     TLScope();
     TLScope(const std::string &name);
 
-    // run the TLScope
+    // entry point
+    void start();
+
+    // run the TLScope application
     void run();
 
     // save user data to a file

@@ -65,6 +65,7 @@ bool TLScope::registerUser() {
         std::cout << "Enter client name    -> ";
         std::cin >> std::ws;
         std::getline(std::cin, user->name);
+        if (user->name == "q") { return false; }
         if (!TLSS_I::validEmail(user->email)) { return false; }
         std::string password;
         if (!TLSS_I::validPassword(password)) { return false; }
@@ -139,7 +140,6 @@ bool TLScope::loginUser() {
         }
 
         user = it->second;
-        std::cout << "Welcome, " << user->name << "!" << std::endl;
         return true;
     }
 }

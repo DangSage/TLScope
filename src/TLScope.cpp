@@ -17,13 +17,11 @@ TLScope::TLScope(const std::string &name) {
     user->name = name;
 }
 
-void TLScope::run() {
-    std::cout << "Running TLScope..." << std::endl;
+void TLScope::start() {
     std::cout << TLSS_C::TITLE_ART << "\033[1A\r     " << "Version: "
         << TLSS_C::VERSION << "  Author: " << TLSS_C::AUTHOR << std::endl
-        << "     GNU General Public License v3.0 - 2021";
+        << "     GNU General Public License v3.0 - 2021" << std::endl << std::endl;
 
-    std::cout << std::endl << std::endl;
     if (newUser) { std::cout << "No users registered. Please register a new user.\n" << std::endl; }
 
     std::cout << " r. Register" << std::endl;
@@ -36,18 +34,27 @@ void TLScope::run() {
         std::cout << ">";
         std::cin >> input;
         if (input == 'q') {
-            break;
+            exit(0);
         } else if (input == 'l') {
-            loginUser();
+            if (!loginUser()) { exit(0); }
             break;
         } else if (input == 'r') {
-            registerUser();
+            if (!registerUser()) { exit(0); }
             break;
         } else {
             std::cout << "Invalid input!" << std::endl;
         }
     }
-    std::cout << "Quitting..." << std::endl;
+}
+
+void TLScope::run() {
+    start();
+    // if user is logged in, start the main program
+    if (user) {
+        std::cout << "Welcome, " << user->name << "!" << std::endl;
+        getUserData();
+    }
+    std::cout << "Closing TLScope..." << std::endl;
 }
 
 void TLScope::getUserData() {

@@ -42,7 +42,8 @@ bool TLSS_I::validEmail(std::string& email) {
         std::cin >> std::ws;
         std::getline(std::cin, email);
         // regex check for email
-        if (std::regex_match(email, std::regex(R"(\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b)"))) {
+        if (std::regex_match(email, 
+        std::regex(R"(\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b)"))) {
             return true;
         } else if (email == "q") {
             return false;

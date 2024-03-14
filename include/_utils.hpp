@@ -12,34 +12,29 @@
 
 namespace TLSS_U {
     // display a list of items in a map
-    std::string display_list(std::map<std::string, std::any> data_dict, std::string prefix="");
+    std::string displayList(std::map<std::string, std::any> data_dict, std::string prefix="");
 
     // salt and hash a piece of data using SHA256
     // * returns a pair of strings: the salt and the hashed data
-    std::pair<std::string, std::string> hash(const std::string& data);
+    extern std::pair<std::string, std::string> hash(const std::string& data);
 
-    // verify a piece of data using a salt and a hash
-    extern bool check_hash(const std::string& data, const std::string& salt, const std::string& hash);
+    // verify a piece of data using data and a hash
+    extern bool checkHash(const std::string& data, const std::string& salt, const std::string& hashed);
 
-    // generate a key pair for RSA encryption
-    extern std::pair<std::string, std::string> generate_key_pair();
+    // gen a key pair for RSA encryption
+    extern std::pair<std::string, std::string> genKeyPair();
 
     // encrypt a file
     // * Step 1: Encrypt the file
     // * Step 2: Encrypt the symmetric key
-    // encrypted_file_info = {
-    //     'encrypted_key': base64.b64encode(encrypted_key).decode(),
-    //     'nonce': base64.b64encode(cipher_aes.nonce).decode(),
-    //     'tag': base64.b64encode(tag).decode(),
-    //     'ciphertext': base64.b64encode(ciphertext).decode(),
-    // }
-    extern std::map<std::string, std::string> encrypt_file(
+    // * Step 3: Return the encrypted file info as a map
+    extern std::map<std::string, std::string> encryptFile(
         const std::string& file_path, const std::string& public_key);
 
     // decrypt a file
     // * Step 1: Decrypt the symmetric key
     // * Step 2: Decrypt the file
-    extern void decrypt_file(
+    extern void decryptFile(
         std::map<std::string, std::string> encrypted_file_info);
 
 }
@@ -83,14 +78,14 @@ namespace _rand {
         return choices[randomIndex];
     }
 
-    // generate a uuid string
+    // gen a uuid string
     extern std::string uuid();
 
-    // generate a random seed integer
+    // gen a random seed integer
     extern size_t seed();
 
-    // generate a random salt
-    std::string generate_salt(size_t length);
+    // gen a random salt
+    std::string genSalt(size_t length);
 }  // namespace _rand
 
 #endif // _TLSS_UTILS_HPP_4204

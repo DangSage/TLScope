@@ -4,7 +4,7 @@
 #include <map>
 #include <any>
 
-std::string TLSS_U::display_list(std::map<std::string, std::any> 
+std::string TLSS_U::displayList(std::map<std::string, std::any> 
     data_dict, std::string prefix) {
     std::stringstream ss;
     if (data_dict.empty()) {
@@ -18,7 +18,7 @@ std::string TLSS_U::display_list(std::map<std::string, std::any>
             if (kv.second.type() == typeid(std::map<std::string, std::any>)) {
                 ss << prefix << ((i == data_dict.size() - 1) ? " └─" : " ├─") 
                     << key << ":\n";
-                ss << display_list(
+                ss << displayList(
                     std::any_cast<std::map<std::string, std::any>>(kv.second),
                     new_prefix + "  ");
             } else {

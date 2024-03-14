@@ -50,7 +50,7 @@ void TLScope::run() {
 
 void TLScope::getUserData() {
     std::cout << "USER DATA:" << std::endl;
-    TLSS_U::display_list(std::map<std::string, std::any> {
+    TLSS_U::displayList(std::map<std::string, std::any> {
         {"name", user->name},
         {"email", user->email},
         {"uuid", user->uuid}

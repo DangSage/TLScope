@@ -113,6 +113,15 @@ bool TLScope::loginUser() {
             return pair.second->email == email;
         });
 
+        if (it == registered_users.end()) {
+            auto dummyHash = TLSS_U::hash("dummypass!");
+            if(!TLSS_U::checkHash(attempt, dummyHash.first, dummyHash.second)) {
+                // nothing to do here, dummyHash is just a placeholder
+            }
+            std::cerr << "Invalid email or password!" << std::endl;
+            continue;
+        }
+
         std::string salt;
         std::string hash;
         size_t pos = it->second->hashedPassword.find("\x1F");
@@ -121,17 +130,6 @@ bool TLScope::loginUser() {
         if (pos != std::string::npos) {
             salt = it->second->hashedPassword.substr(0, pos);
             hash = it->second->hashedPassword.substr(pos + 1);
-        }
-
-        // std::cout << salt << std::endl << hash << std::endl;
-
-        if (it == registered_users.end()) {
-            auto dummyHash = TLSS_U::hash("dummypass!");
-            if(!TLSS_U::checkHash(attempt, dummyHash.first, dummyHash.second)) {
-                // nothing to do here, dummyHash is just a placeholder
-            }
-            std::cerr << "Invalid email or password!" << std::endl;
-            continue;
         }
 
         if (!TLSS_U::checkHash(attempt, salt, hash)) {

@@ -4,11 +4,9 @@
 #define _TLSS_USER_HPP_4204
 
 #include <boost/serialization/vector.hpp>
-#include <fstream>
 #include <string>
 #include <map>
 #include <memory>
-#include <vector>
 
 // user class for the user data
 // * Will be used to save and load user data

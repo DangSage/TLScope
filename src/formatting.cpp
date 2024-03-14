@@ -1,6 +1,8 @@
+// Display formatting functions for the user interface.
 #include "_utils.hpp"
 #include "user.hpp"
 #include <string>
+#include <sstream>
 #include <map>
 #include <any>
 

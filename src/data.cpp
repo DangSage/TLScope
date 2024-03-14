@@ -1,4 +1,5 @@
-// Copyright @ 2024, Ethan Dang
+// Data handling functions for the application
+// * Will be used to manipulate user data
 #include "_constants.hpp"
 #include "_utils.hpp"
 #include "TLScope.hpp"

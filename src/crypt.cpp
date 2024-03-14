@@ -1,5 +1,5 @@
 // Cryptographic methods and functions
-// OpenSSL will be used for the cryptographic methods
+// * OpenSSL will be used for the cryptographic methods
 #include "_utils.hpp"
 #include "user.hpp"
 
@@ -13,8 +13,6 @@
 #include <cryptopp/files.h>
 #include <cryptopp/osrng.h>
 #include <string>
-#include <sstream>
-#include <iomanip>
 
 using namespace CryptoPP;
 

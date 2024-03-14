@@ -1,4 +1,3 @@
-// Copyright @ 2024, Ethan Dang
 // utility functions for random number generation
 #include "_utils.hpp"
 #include <random>

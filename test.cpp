@@ -1,4 +1,6 @@
 // Copyright Ethan Dang 2024
+// * All tests are for utility functions and classes
+// * No tests should be to run the main program
 #undef timeout
 #include <iostream>
 #include <string>

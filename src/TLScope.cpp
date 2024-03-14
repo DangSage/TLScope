@@ -7,7 +7,7 @@
 #include <string>
 #include <map>
 
-TLScope::TLScope(): user(std::make_shared<USER>()) {
+TLScope::TLScope(): user(nullptr) {
     registered_users = buildRegisteredUsers();
     newUser = registered_users.empty();
 }
@@ -34,12 +34,12 @@ void TLScope::start() {
         std::cout << ">";
         std::cin >> input;
         if (input == 'q') {
-            exit(0);
+            return;
         } else if (input == 'l') {
-            if (!loginUser()) { exit(0); }
+            if (!loginUser()) { return; }
             break;
         } else if (input == 'r') {
-            if (!registerUser()) { exit(0); }
+            if (!registerUser()) { return; }
             break;
         } else {
             std::cout << "Invalid input!" << std::endl;
@@ -62,6 +62,7 @@ void TLScope::getUserData() {
     TLSS_U::displayList(std::map<std::string, std::any> {
         {"name", user->name},
         {"email", user->email},
-        {"uuid", user->uuid}
+        {"uuid", user->uuid},
+        {"hashedPassword", user->hashedPassword}
     });
 }

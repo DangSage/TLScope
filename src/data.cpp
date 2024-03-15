@@ -74,21 +74,18 @@ bool TLScope::registerUser() {
         user->hashedPassword = hash.first + "\x1F" + hash.second;
         std::cout << std::endl;
 
-        // std::cout << hash.first << std::endl << hash.second << std::endl;
-
         if (user->name.empty()) {
             std::cerr << "Error: Name cannot be empty!" << std::endl;
             return false;
         }
+
         auto it = std::find_if(registered_users.begin(), registered_users.end(), [&](std::pair<std::string, std::shared_ptr<USER>> pair) {
             return pair.second->email == user->email;
         });
-
         if (it != registered_users.end()) {
             std::cerr << "Error: User already exists!" << std::endl;
             return false;
         }
-
         break;
     }
 

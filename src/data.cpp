@@ -61,6 +61,7 @@ std::shared_ptr<USER> loadUserData(const std::string& uuid) {
 }
 
 bool TLScope::registerUser() {
+    user = std::make_shared<USER>();
     while (true) {
         std::cout << "Enter client name    -> ";
         std::cin >> std::ws;

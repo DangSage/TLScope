@@ -4,6 +4,7 @@
 
 #include <string>
 
+// constants for the TLScope project
 namespace TLSS_C {
 
 const std::string_view VERSION = "0.0.1";

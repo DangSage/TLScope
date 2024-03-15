@@ -31,7 +31,7 @@ private:
     int sock;
     std::string ip;
     std::string token;
-    std::map<std::string, USER> onlineUsers;
+    std::map<std::string, std::shared_ptr<USER>> onlineUsers;
 
     void initOpenSSL();
     void cleanupOpenSSL();

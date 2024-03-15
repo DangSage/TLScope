@@ -19,28 +19,33 @@ TLScope::TLScope(const std::string &name) {
 
 void TLScope::start() {
     std::cout << TLSS_C::TITLE_ART << "\033[1A\r     " << "Version: "
-        << TLSS_C::VERSION << "  Author: " << TLSS_C::AUTHOR << std::endl
+        << TLSS_C::VERSION << " | Author: " << TLSS_C::AUTHOR << " [G]" << std::endl
         << "     GNU General Public License v3.0 - 2021" << std::endl << std::endl;
 
     if (newUser) { std::cout << "No users registered. Please register a new user.\n" << std::endl; }
 
-    std::cout << " r. Register" << std::endl;
-    if (!newUser) { std::cout << " l. Login" << std::endl; }
-    std::cout << " q. Quit (q to quit)" << std::endl;
+    std::cout << " R. Register" << std::endl;
+    if (!newUser) { std::cout << " L. Login" << std::endl; }
+    std::cout << " Q. Quit (q to quit)" << std::endl;
     std::cout << "─────────────────────────────────────────────" << std::endl;
 
     char input;
     while (true) {
         std::cout << ">";
         std::cin >> input;
-        if (input == 'q') {
+        input = std::toupper(input);
+        if (input == 'Q') {
             return;
-        } else if (input == 'l') {
+        } else if (input == 'L') {
             if (!loginUser()) { return; }
             break;
-        } else if (input == 'r') {
+        } else if (input == 'R') {
             if (!registerUser()) { return; }
+            user.reset(); // reset user to nullptr
             break;
+        } else if (input == 'G') {
+            std::string url = "https://github.com/DangSage/TLScope";
+            std::cout << "> visit @" << url << std::endl;
         } else {
             std::cout << "Invalid input!" << std::endl;
         }
@@ -50,7 +55,7 @@ void TLScope::start() {
 void TLScope::run() {
     start();
     // if user is logged in, start the main program
-    if (user) {
+    if (user != nullptr) {
         std::cout << "Welcome, " << user->name << "!" << std::endl;
         getUserData();
     }
@@ -62,7 +67,6 @@ void TLScope::getUserData() {
     TLSS_U::displayList(std::map<std::string, std::any> {
         {"name", user->name},
         {"email", user->email},
-        {"uuid", user->uuid},
-        {"hashedPassword", user->hashedPassword}
+        {"uuid", user->uuid}
     });
 }

@@ -10,6 +10,7 @@
 #include <mutex>
 #include <vector>
 #include <atomic>
+#include <thread>
 #include <map>
 
 // forward declarations
@@ -56,6 +57,9 @@ private:
     std::string _token;
     std::map<std::string, std::shared_ptr<USER>> onlineUsers;
     std::mutex onlineUsersMutex;
+
+    std::thread _udpClient;
+    std::thread _udpServer;
 
     void initOpenSSL();
     void cleanupOpenSSL();

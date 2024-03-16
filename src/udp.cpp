@@ -14,10 +14,10 @@ void NetManager::UDPClient(const std::string& ip) {
     std::cout << "UDP client thread started" << std::endl;
 
     while (_running) {
-        std::cout << "^";
+
     }
 
-    std::cout << "UDP client closed." << std::endl;
+    std::cout << " ├─UDP client closed\n";
 }
 
 void NetManager::UDPServer(const std::string& ip) {
@@ -27,8 +27,8 @@ void NetManager::UDPServer(const std::string& ip) {
     std::cout << "UDP server thread started" << std::endl;
 
     while (_running) {
-        std::cout << ".";
+
     }
 
-    std::cout << "UDP server closed." << std::endl;
+    std::cout << " ├─UDP server closed\n";
 }

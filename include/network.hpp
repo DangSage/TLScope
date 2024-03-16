@@ -28,6 +28,11 @@ public:
     NetManager();
     ~NetManager();
 
+    // start threads for the client and server connections
+    void threads();
+
+    // kill the threads for the client and server connections
+    void kill();
 
     // UDP client thread to ping devices listening on the designated port
     void UDPClient(const std::string& ip);

@@ -3,6 +3,7 @@
 #ifndef _TLSS_MAIN_HPP_4204
 #define _TLSS_MAIN_HPP_4204
 
+#include "network.hpp"
 #include <string>
 #include <memory>
 #include <map>
@@ -38,6 +39,9 @@ private:
     std::shared_ptr<USER> user;
     std::map<std::string, std::shared_ptr<USER>> registered_users;
     std::map<std::string, std::shared_ptr<USER>> online_users;
+
+    // network manager
+    std::unique_ptr<NetManager> netManager;
 };
 
 #endif // _TLSS_MAIN_HPP_4204

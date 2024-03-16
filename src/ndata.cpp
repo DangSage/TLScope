@@ -12,6 +12,7 @@
 void NetManager::initOpenSSL() {
     SSL_library_init();
     SSL_load_error_strings();
+    ERR_load_BIO_strings();
     OpenSSL_add_all_algorithms();
 }
 
@@ -57,6 +58,11 @@ NetManager::NetManager() {
     _ip = inet_ntoa(*addr_list[0]);
     
     // start the server and client threads
-    std::thread serverThread(&NetManager::TCPServer, this, _ip, TLSS_C::PORT);
-    std::thread clientThread(&NetManager::TCPClient, this, _ip, TLSS_C::PORT);
+    std::thread serverThread(&NetManager::UDPServer, this, _ip, TLSS_C::PORT);
+    std::thread clientThread(&NetManager::UDPClient, this, _ip, TLSS_C::PORT);
+}
+
+NetManager::~NetManager() {
+    cleanupOpenSSL();
+    std::cout << "NetManager closed." << std::endl;
 }

@@ -35,27 +35,24 @@ public:
     // UDP server thread to listen for pings on the designated port
     void UDPServer(const std::string& ip);
 
-    // TCP client thread to send messages
-    void TCPClient(const std::string& ip, int port);
+    // // TCP client thread to send messages
+    // void TCPClient(const std::string& ip, int port);
 
-    // TCP server thread to listen for messages 
-    void TCPServer(const std::string& ip, int port);
+    // // TCP server thread to listen for messages 
+    // void TCPServer(const std::string& ip, int port);
 
 
 private:
-    SSL_CTX* ctx;
-    SSL* ssl;
-    int sock;
-    std::string ip;
-    std::string token;
+    SSL_CTX* _ctx;
+    SSL* _ssl;
+    std::string _ip;
+    std::string _token;
     std::map<std::string, std::shared_ptr<USER>> onlineUsers;
     std::mutex onlineUsersMutex;
 
     void initOpenSSL();
     void cleanupOpenSSL();
-    void createSocket(const std::string& ip, int port);
-    void createSSLContext();
-    void createSSLConnection();
+    int createSocket(const std::string& ip, int port);
 };
 
 #endif // _TLSS_NETWORK_HPP_4204

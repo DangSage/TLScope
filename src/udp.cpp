@@ -5,7 +5,6 @@
 #include <string>
 #include <memory>
 
-// UDP client thread to ping devices listening on the designated port
 void NetManager::UDPClient(const std::string& ip) {
     // create a socket
     // send a ping to the ip
@@ -13,5 +12,23 @@ void NetManager::UDPClient(const std::string& ip) {
     // if a response is received, add the ip to the list of online users
     // if no response is received, remove the ip from the list of online users
     std::cout << "UDP client thread started" << std::endl;
-    
+
+    while (_running) {
+        std::cout << "^";
+    }
+
+    std::cout << "UDP client closed." << std::endl;
+}
+
+void NetManager::UDPServer(const std::string& ip) {
+    // create a socket
+    // listen for pings
+    // if a ping is received, send a response
+    std::cout << "UDP server thread started" << std::endl;
+
+    while (_running) {
+        std::cout << ".";
+    }
+
+    std::cout << "UDP server closed." << std::endl;
 }

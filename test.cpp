@@ -10,6 +10,7 @@
 #define BOOST_TEST_MODULE TLScopeTest
 #include <boost/test/unit_test.hpp>
 
+#include "network.hpp"
 #include "TLScope.hpp"
 #include "user.hpp"
 #include "_utils.hpp"
@@ -30,4 +31,10 @@ BOOST_AUTO_TEST_CASE(hashTest) {
     std::pair<std::string, std::string> hashed = TLSS_U::hash(data);
     BOOST_CHECK_NE(data, hashed.second);
     BOOST_CHECK(TLSS_U::checkHash(data, hashed.first, hashed.second));
+}
+
+BOOST_AUTO_TEST_CASE(NetManagerTest) {
+    std::unique_ptr<NetManager> nm = std::make_unique<NetManager>();
+    BOOST_CHECK_NO_THROW(nm->threads());
+    BOOST_CHECK_NO_THROW(nm->kill());
 }

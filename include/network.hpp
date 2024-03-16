@@ -9,6 +9,7 @@
 #include <openssl/ssl.h>
 #include <mutex>
 #include <vector>
+#include <atomic>
 #include <map>
 
 // forward declarations
@@ -48,6 +49,7 @@ public:
 
 
 private:
+    std::atomic<bool> _running;
     SSL_CTX* _ctx;
     SSL* _ssl;
     std::string _ip;

@@ -1,6 +1,6 @@
 CC = g++
 CFLAGS = -Wall -Werror -std=c++17 -pedantic -g
-LIBS = -lboost_unit_test_framework -lboost_serialization -lftxui-component -lftxui-dom -lftxui-screen -lcryptopp -Iinclude -Isrc
+LIBS = -lboost_unit_test_framework -lboost_serialization -lssl -lcrypto -lcryptopp -Iinclude -Isrc
 
 SRC = $(wildcard src/*.cpp)
 OBJ = $(patsubst src/%.cpp,bin/%.o,$(SRC))

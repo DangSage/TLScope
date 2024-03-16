@@ -10,10 +10,19 @@
 #include <thread>
 
 void NetManager::initOpenSSL() {
+    // Initialize OpenSSL
     SSL_library_init();
     SSL_load_error_strings();
-    ERR_load_BIO_strings();
     OpenSSL_add_all_algorithms();
+
+    // Create a new SSL context
+    _ctx = SSL_CTX_new(DTLS_method());
+    if (_ctx == NULL) {
+        // Handle error
+        exit(1);
+    }
+
+    // Set options on the context (for example, load certificates)
 }
 
 int NetManager::createSocket(const std::string& ip, int port) {
@@ -32,6 +41,7 @@ int NetManager::createSocket(const std::string& ip, int port) {
         perror("connect");
         exit(1);
     }
+    return sock;
 }
 
 void NetManager::cleanupOpenSSL() {
@@ -56,13 +66,25 @@ NetManager::NetManager() {
 
     struct in_addr **addr_list = (struct in_addr **) host->h_addr_list;
     _ip = inet_ntoa(*addr_list[0]);
-    
-    // start the server and client threads
-    std::thread serverThread(&NetManager::UDPServer, this, _ip, TLSS_C::PORT);
-    std::thread clientThread(&NetManager::UDPClient, this, _ip, TLSS_C::PORT);
 }
 
 NetManager::~NetManager() {
     cleanupOpenSSL();
     std::cout << "NetManager closed." << std::endl;
+}
+
+void NetManager::threads() {
+    _running = true;
+
+    std::thread serverThread(&NetManager::UDPServer, this, _ip);
+    std::thread clientThread(&NetManager::UDPClient, this, _ip);
+
+    serverThread.detach();
+    clientThread.detach();
+}
+
+void NetManager::kill() {
+    // kill the server and client threads
+    // *Need to be defined
+    _running = false;
 }

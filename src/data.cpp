@@ -106,7 +106,7 @@ bool TLScope::loginUser() {
         if (attempt == "q") { return false; }
         std::cout << std::endl;
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(_rand::value(0, 1000)));
+        std::this_thread::sleep_for(std::chrono::milliseconds(_rand::value(0, 3000)));
         auto it = std::find_if(registered_users.begin(), registered_users.end(), [&](std::pair<std::string, std::shared_ptr<USER>> pair) {
             return pair.second->email == email;
         });

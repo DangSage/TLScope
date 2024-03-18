@@ -20,7 +20,7 @@ bool TLScope::saveUserData(std::shared_ptr<USER> user) {
     if(user->uuid.empty()) {
         user->uuid = _rand::uuid();
     }
-    std::string filedir = TLSS_C::SAVE_DIR 
+    std::string filedir = TLSS_C::SAVE_DIR
         + user->uuid + TLSS_C::SAVE_EXT;
 
     std::ofstream ofs(filedir, std::ios::binary);

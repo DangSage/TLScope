@@ -1,12 +1,7 @@
+// Copyright 2024 Ethan Dang
 // Data handling functions for the application
 // * Will be used to manipulate user data
-#include "_constants.hpp"
-#include "_utils.hpp"
-#include "TLScope.hpp"
-#include "user.hpp"
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/archive/archive_exception.hpp>
+
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -14,17 +9,24 @@
 #include <limits>
 #include <chrono>
 #include <thread>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/archive_exception.hpp>
+#include "_constants.hpp"
+#include "_utils.hpp"
+#include "TLScope.hpp"
+#include "user.hpp"
 
 bool TLScope::saveUserData(std::shared_ptr<USER> user) {
     std::cout << "Saving..." << std::endl;
-    if(user->uuid.empty()) {
+    if (user->uuid.empty()) {
         user->uuid = _rand::uuid();
     }
     std::string filedir = TLSS_C::SAVE_DIR
         + user->uuid + TLSS_C::SAVE_EXT;
 
     std::ofstream ofs(filedir, std::ios::binary);
-    if(!ofs) { // check if file opened successfully
+    if (!ofs) {  // check if file opened successfully
         std::cerr << "Error opening file for saving: " << filedir << std::endl;
         return false;
     }
@@ -42,12 +44,12 @@ bool TLScope::saveUserData(std::shared_ptr<USER> user) {
 
 std::shared_ptr<USER> loadUserData(const std::string& uuid) {
     std::string filedir = TLSS_C::SAVE_DIR + uuid + TLSS_C::SAVE_EXT;
-    std::shared_ptr<USER> user = std::make_shared<USER>(); // Initialize the shared_ptr
-    if(!std::filesystem::exists(filedir)) {
+    std::shared_ptr<USER> user = std::make_shared<USER>();  // Initialize the shared_ptr
+    if (!std::filesystem::exists(filedir)) {
         throw std::runtime_error("Error: File does not exist: " + filedir);
     }
     std::ifstream ifs(filedir, std::ios::binary);
-    if(!ifs) {
+    if (!ifs) {
         throw std::runtime_error("Error opening file for loading: " + filedir);
     }
     try {
@@ -56,7 +58,7 @@ std::shared_ptr<USER> loadUserData(const std::string& uuid) {
     } catch (boost::archive::archive_exception& e) {
         throw std::runtime_error("Error loading userdata: " + std::string(e.what()));
     }
-    
+
     return user;
 }
 
@@ -70,7 +72,7 @@ bool TLScope::registerUser() {
         if (!TLSS_I::validEmail(user->email)) { return false; }
         std::string password;
         if (!TLSS_I::validPassword(password)) { return false; }
-        auto hash = TLSS_U::hash(password); // salt + hash
+        auto hash = TLSS_U::hash(password);  // salt + hash
         user->hashedPassword = hash.first + "\x1F" + hash.second;
         std::cout << std::endl;
 
@@ -79,7 +81,8 @@ bool TLScope::registerUser() {
             return false;
         }
 
-        auto it = std::find_if(registered_users.begin(), registered_users.end(), [&](std::pair<std::string, std::shared_ptr<USER>> pair) {
+        auto it = std::find_if(registered_users.begin(), registered_users.end(),
+        [&](std::pair<std::string, std::shared_ptr<USER>> pair) {
             return pair.second->email == user->email;
         });
         if (it != registered_users.end()) {
@@ -107,13 +110,14 @@ bool TLScope::loginUser() {
         std::cout << std::endl;
 
         std::this_thread::sleep_for(std::chrono::milliseconds(_rand::value(0, 3000)));
-        auto it = std::find_if(registered_users.begin(), registered_users.end(), [&](std::pair<std::string, std::shared_ptr<USER>> pair) {
+        auto it = std::find_if(registered_users.begin(), registered_users.end(),
+        [&](std::pair<std::string, std::shared_ptr<USER>> pair) {
             return pair.second->email == email;
         });
 
         if (it == registered_users.end()) {
             auto dummyHash = TLSS_U::hash("dummypass!");
-            if(!TLSS_U::checkHash(attempt, dummyHash.first, dummyHash.second)) {
+            if (!TLSS_U::checkHash(attempt, dummyHash.first, dummyHash.second)) {
                 // nothing to do here, dummyHash is just a placeholder
             }
             std::cerr << "Invalid email or password!" << std::endl;
@@ -145,14 +149,14 @@ std::map<std::string, std::shared_ptr<USER>> buildRegisteredUsers() {
     if (!std::filesystem::exists(TLSS_C::SAVE_DIR)) {
         std::filesystem::create_directory(TLSS_C::SAVE_DIR);
     }
-    for(const auto& entry : std::filesystem::directory_iterator(TLSS_C::SAVE_DIR)) {
+    for (const auto& entry : std::filesystem::directory_iterator(TLSS_C::SAVE_DIR)) {
         // only load .sav files
-        if(entry.path().extension() != TLSS_C::SAVE_EXT) {
+        if (entry.path().extension() != TLSS_C::SAVE_EXT) {
             continue;
         }
         std::string filedir = entry.path().string();
         std::ifstream ifs(filedir, std::ios::binary);
-        if(!ifs) {
+        if (!ifs) {
             throw std::runtime_error("Error opening file for loading: " + filedir);
         }
         try {

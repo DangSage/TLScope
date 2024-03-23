@@ -6,29 +6,40 @@
 #include <memory>
 
 void NetManager::UDPClient(const std::string& ip) {
+    std::unique_lock<std::mutex> lock(mtx);
+    runningThreads++;
+    
     // create a socket
     // send a ping to the ip
     // wait for a response
     // if a response is received, add the ip to the list of online users
     // if no response is received, remove the ip from the list of online users
-    std::cout << "UDP client thread started" << std::endl;
 
     while (_running.load()) {
         // do stuff
     }
 
-    std::cout << " ├─UDP client closed\n";
+    lock.lock();
+    runningThreads--;
+    if (runningThreads == 0) {
+        cv.notify_all();
+    }
 }
 
 void NetManager::UDPServer(const std::string& ip) {
+    std::unique_lock<std::mutex> lock(mtx);
+    runningThreads++;
     // create a socket
     // listen for pings
     // if a ping is received, send a response
-    std::cout << "UDP server thread started" << std::endl;
 
     while (_running.load()) {
         // do stuff
     }
 
-    std::cout << " ├─UDP server closed\n";
+    lock.lock();
+    runningThreads--;
+    if (runningThreads == 0) {
+        cv.notify_all();
+    }
 }

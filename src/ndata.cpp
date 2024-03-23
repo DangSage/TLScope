@@ -73,9 +73,11 @@ NetManager::~NetManager() {
         kill();
         if (_udpServer.joinable()) {
             _udpServer.join();
+            std::cout << " ├─UDP server closed" << std::endl;
         }
         if (_udpClient.joinable()) {
             _udpClient.join();
+            std::cout << " ├─UDP client closed" << std::endl;
         }
     }
     cleanupOpenSSL();
@@ -88,6 +90,12 @@ void NetManager::threads() {
     // Start the UDP client and server threads
     _udpServer = std::thread(&NetManager::UDPServer, this, _ip);
     _udpClient = std::thread(&NetManager::UDPClient, this, _ip);
+
+}
+
+void NetManager::waitForThreads() {
+    std::unique_lock<std::mutex> lock(mtx);
+    cv.wait(lock, [this]{ return runningThreads == 0; });
 }
 
 void NetManager::kill() {

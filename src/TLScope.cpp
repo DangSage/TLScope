@@ -58,6 +58,7 @@ void TLScope::run() {
     if (user != nullptr) {
         netManager = std::make_unique<NetManager>();
         netManager->threads();
+
         std::cout << "Welcome, " << user->name << "!" << std::endl;
         while (netManager->_running) {
             std::string input;
@@ -72,6 +73,7 @@ void TLScope::run() {
             }
         }
     }
+    netManager->kill();
     std::cout << "Closing TLScope..." << std::endl;
 }
 

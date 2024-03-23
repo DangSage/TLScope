@@ -34,6 +34,9 @@ public:
     // start threads for the client and server connections
     void threads();
 
+    // wait for the threads to finish
+    void waitForThreads();
+
     // kill the threads for the client and server connections
     void kill();
 

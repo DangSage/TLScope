@@ -7,6 +7,7 @@
 #include <string>
 #include <memory>
 #include <openssl/ssl.h>
+#include <condition_variable>
 #include <mutex>
 #include <vector>
 #include <atomic>
@@ -55,6 +56,11 @@ private:
     SSL* _ssl;
     std::string _ip;
     std::string _token;
+
+    std::condition_variable cv; // condition variable for thread safety
+    std::mutex mtx;             // mutex for thread safety
+    int runningThreads = 0;     // number of running threads
+
     std::map<std::string, std::shared_ptr<USER>> onlineUsers;
     std::mutex onlineUsersMutex;
 

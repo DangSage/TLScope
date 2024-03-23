@@ -48,7 +48,7 @@ void NetManager::cleanupOpenSSL() {
     EVP_cleanup();
 }
 
-NetManager::NetManager() {
+NetManager::NetManager(): _running(true){
     // *Need to be defined
     initOpenSSL();
 
@@ -66,41 +66,23 @@ NetManager::NetManager() {
 
     struct in_addr **addr_list = (struct in_addr **) host->h_addr_list;
     _ip = inet_ntoa(*addr_list[0]);
+
+    _udpClient = std::thread(&NetManager::udpPing, this);
+    _udpServer = std::thread(&NetManager::udpReceive, this);
+
+    // wait for the threads to boot up
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 }
 
 NetManager::~NetManager() {
-    if (_running) {
-        kill();
-        if (_udpServer.joinable()) {
-            _udpServer.join();
-            std::cout << " ├─UDP server closed" << std::endl;
-        }
-        if (_udpClient.joinable()) {
-            _udpClient.join();
-            std::cout << " ├─UDP client closed" << std::endl;
-        }
+    if (_udpServer.joinable()) {
+        _udpServer.join();
+        std::cout << " ├─UDP server closed" << std::endl;
+    }
+    if (_udpClient.joinable()) {
+        _udpClient.join();
+        std::cout << " ├─UDP client closed" << std::endl;
     }
     cleanupOpenSSL();
     std::cout << " └─NetManager closed." << std::endl;
-}
-
-void NetManager::threads() {
-    _running.store(true);
-
-    // Start the UDP client and server threads
-    _udpServer = std::thread(&NetManager::UDPServer, this, _ip);
-    _udpClient = std::thread(&NetManager::UDPClient, this, _ip);
-
-}
-
-void NetManager::waitForThreads() {
-    std::unique_lock<std::mutex> lock(mtx);
-    cv.wait(lock, [this]{ return runningThreads == 0; });
-}
-
-void NetManager::kill() {
-    // kill the server and client threads
-    // *Need to be defined
-    std::cout << "Closing NetManager:" << std::endl;
-    _running.store(false);
 }

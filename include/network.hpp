@@ -31,38 +31,19 @@ public:
     NetManager();
     ~NetManager();
 
-    // start threads for the client and server connections
-    void threads();
-
-    // wait for the threads to finish
-    void waitForThreads();
-
-    // kill the threads for the client and server connections
-    void kill();
 
     // UDP client thread to ping devices listening on the designated port
-    void UDPClient(const std::string& ip);
+    void udpPing();
     
     // UDP server thread to listen for pings on the designated port
-    void UDPServer(const std::string& ip);
-
-    // // TCP client thread to send messages
-    // void TCPClient(const std::string& ip, int port);
-
-    // // TCP server thread to listen for messages 
-    // void TCPServer(const std::string& ip, int port);
+    void udpReceive();
 
     std::atomic<bool> _running;
 
 private:
     SSL_CTX* _ctx;
-    SSL* _ssl;
     std::string _ip;
     std::string _token;
-
-    std::condition_variable cv; // condition variable for thread safety
-    std::mutex mtx;             // mutex for thread safety
-    int runningThreads = 0;     // number of running threads
 
     std::map<std::string, std::shared_ptr<USER>> onlineUsers;
     std::mutex onlineUsersMutex;

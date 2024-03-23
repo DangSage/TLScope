@@ -56,8 +56,21 @@ void TLScope::run() {
     start();
     // if user is logged in, start the main program
     if (user != nullptr) {
+        netManager = std::make_unique<NetManager>();
+        netManager->threads();
         std::cout << "Welcome, " << user->name << "!" << std::endl;
-        getUserData();
+        while (netManager->_running) {
+            std::string input;
+            std::cout << ">";
+            std::cin >> input;
+            if (input == "q") {
+                netManager->_running.store(false);
+            } else if (input == "user") {
+                getUserData();
+            } else {
+                std::cerr << "Invalid input!" << std::endl;
+            }
+        }
     }
     std::cout << "Closing TLScope..." << std::endl;
 }

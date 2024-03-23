@@ -48,9 +48,9 @@ public:
     // // TCP server thread to listen for messages 
     // void TCPServer(const std::string& ip, int port);
 
+    std::atomic<bool> _running;
 
 private:
-    std::atomic<bool> _running;
     SSL_CTX* _ctx;
     SSL* _ssl;
     std::string _ip;

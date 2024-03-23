@@ -83,19 +83,16 @@ NetManager::~NetManager() {
 }
 
 void NetManager::threads() {
-    _running = true;
+    _running.store(true);
 
     // Start the UDP client and server threads
     _udpServer = std::thread(&NetManager::UDPServer, this, _ip);
     _udpClient = std::thread(&NetManager::UDPClient, this, _ip);
-
-    _udpServer.detach();
-    _udpClient.detach();
 }
 
 void NetManager::kill() {
     // kill the server and client threads
     // *Need to be defined
     std::cout << "Closing NetManager:" << std::endl;
-    _running = false;
+    _running.store(false);
 }

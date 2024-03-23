@@ -13,8 +13,8 @@ void NetManager::UDPClient(const std::string& ip) {
     // if no response is received, remove the ip from the list of online users
     std::cout << "UDP client thread started" << std::endl;
 
-    while (_running) {
-
+    while (_running.load()) {
+        // do stuff
     }
 
     std::cout << " ├─UDP client closed\n";
@@ -26,8 +26,8 @@ void NetManager::UDPServer(const std::string& ip) {
     // if a ping is received, send a response
     std::cout << "UDP server thread started" << std::endl;
 
-    while (_running) {
-
+    while (_running.load()) {
+        // do stuff
     }
 
     std::cout << " ├─UDP server closed\n";

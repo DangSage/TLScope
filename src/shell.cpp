@@ -7,9 +7,13 @@
 #include <iostream>
 #include <string>
 #include <functional>
+#include <atomic>
+#include <csignal>
 #include <map>
 
+
 void TLScope::shell() {
+
     std::map<std::string, std::string> commandDescriptions = {
         {"\033[31m^C", "Quit\033[0m"},
         {" h", "Help"},

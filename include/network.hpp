@@ -20,7 +20,7 @@ class USER;
 // network class
 // * will contain all network related classes and methods
 // * needs to be able to send and receive data
-// ** UDP connections for device discovery (ping w/ DTLS)
+// ** UDP connections for device discovery (ping w/ broadcast)
 // ** TCP connections for sending and receiving messages (TLS)
 class NetManager {
 public:
@@ -34,16 +34,14 @@ public:
     // running flag for the threads (atomic)
     std::atomic<bool> _running = true;
 private:
-
     // start the UDP client
     void udpHandler();
 
-    int createSocket(const std::string& ip, int port);
-
-    // context for the SSL connection (UDP)
-    SSL_CTX *_ctxU;
+    // context for the SSL connection (TLS/TCP)
+    SSL_CTX *_ctxT;
     // UDP port
     int _uPort;
+    int _uSocket;
 
     std::string _ip;
     std::string _token;

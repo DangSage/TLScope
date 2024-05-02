@@ -18,17 +18,15 @@
 #include "user.hpp"
 
 void NetManager::udpHandler() {
-    int sockfd;
-
     // Creating socket file descriptor
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    if ((_uSocket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket creation failed");
         exit(EXIT_FAILURE);
     }
     struct sockaddr_in servaddr, cliaddr;
 
     int broadcastEnable = 1;
-    int ret = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+    int ret = setsockopt(_uSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
     if (ret) {
         perror("Error: could not enable broadcast option on socket");
         exit(EXIT_FAILURE);
@@ -44,14 +42,14 @@ void NetManager::udpHandler() {
     timeout.tv_sec = 0;
     timeout.tv_usec = 500000;
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+    if (setsockopt(_uSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
         perror("Error: could not set recv timeout");
         exit(EXIT_FAILURE);
     }
 
     while (true) {
         servaddr.sin_port = htons(_uPort);
-        if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+        if (bind(_uSocket, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
             servaddr.sin_port = htons(_uPort++);
         } else {
             break;
@@ -74,7 +72,7 @@ void NetManager::udpHandler() {
             servaddr.sin_addr.s_addr = INADDR_BROADCAST;
             port > endPort ? port = TLSS_C::PORT+10 : port++;
             servaddr.sin_port = htons(port);
-            int bytesSent = sendto(sockfd, (const char *)message.c_str(), message.size(),
+            int bytesSent = sendto(_uSocket, (const char *)message.c_str(), message.size(),
                 MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
                 sizeof(servaddr));
             if (bytesSent == -1) {
@@ -85,7 +83,7 @@ void NetManager::udpHandler() {
         // Create a future for the receive operation
         auto recv_future = std::async(std::launch::async, [&]() {
             servaddr.sin_addr.s_addr = INADDR_ANY;
-            n = recvfrom(sockfd, buffer, sizeof(buffer) - 1, MSG_WAITALL,
+            n = recvfrom(_uSocket, buffer, sizeof(buffer) - 1, MSG_WAITALL,
             (struct sockaddr *) &cliaddr, (socklen_t*)&len);
             if (n >= 0) {
                 buffer[n] = '\0';
@@ -126,9 +124,9 @@ void NetManager::udpHandler() {
         }
         // Always send a "pong" response back to the client
         std::string response = "pong:" + _token;
-        sendto(sockfd, (const char *)response.c_str(), response.size(),
+        sendto(_uSocket, (const char *)response.c_str(), response.size(),
             MSG_CONFIRM, (const struct sockaddr *) &cliaddr, len);
     }
-    close(sockfd);
+    close(_uSocket);
 }
 

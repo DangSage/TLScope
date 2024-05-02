@@ -7,7 +7,8 @@
 #include <string>
 #include <map>
 
-TLScope::TLScope(): user(nullptr) {
+
+TLScope::TLScope(): user(nullptr), netManager(nullptr) {
     registered_users = buildRegisteredUsers();
     newUser = registered_users.empty();
 }
@@ -61,15 +62,16 @@ void TLScope::run() {
         netManager = std::make_unique<NetManager>(user->uuid);
         std::cout << "Welcome, " << user->name << "!" << std::endl;
         shell();
+
+        netManager->_udpClient.join();
+        netManager.reset();
     }
-    netManager->_udpClient.join();
-    netManager.reset();
     std::cout << "Closing TLScope..." << std::endl;
 }
 
 bool TLScope::getUserData() {
     try {
-        std::cout << "USER DATA:" << std::endl;
+        std::cout << "My user data:" << std::endl;
         TLSS_U::displayList(std::map<std::string, std::any> {
             {"name", user->name},
             {"email", user->email},

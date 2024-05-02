@@ -24,17 +24,27 @@ class USER;
 // ** TCP connections for sending and receiving messages (TLS)
 class NetManager {
 public:
-    NetManager() = default;
-    ~NetManager() = default;
+    NetManager();
+    ~NetManager();
 
-
-    // UDP client thread to ping devices listening on the designated port
-    void udpPing();
-    
-    // UDP server thread to listen for pings on the designated port
-    void udpReceive();
+    // start the UDP client
+    void udpHandler();
+    void udpPing(int sockfd);
+    void udpReceive(int sockfd);
 
 private:
+    // running flag for the threads (atomic)
+    std::atomic<bool> _running = true;
+
+    int createSocket(const std::string& ip, int port);
+
+    // Thread for the UDP client
+    std::thread _udpClient;
+    // context for the SSL connection (UDP)
+    SSL_CTX *_ctxU;
+    // UDP port
+    int _uPort;
+
     std::string _ip;
     std::string _token;
 };

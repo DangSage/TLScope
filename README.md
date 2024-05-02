@@ -20,3 +20,7 @@ This project depends on the following libraries:
 - Crypto++: Used for creating cryptographic functions. Install with `sudo apt-get install libcrypto++-dev libcrypto++-doc libcrypto++-utils`
 - Boost: Used for various utility functions and data structures. Install with `sudo apt-get install libboost-all-dev` on Ubuntu.
 - FTXUI: Used for easy UI building and visuals. Clone and build this library from Arthur Sonzogni's gitHub repository at https://github.com/ArthurSonzogni/FTXUI
+
+IF NO CA, GENERATE WITH THE COMMAND IN THE WORKING DIRECTORY:
+`openssl genrsa -des3 -out ca.key 2048`
+`openssl req -x509 -new -nodes -key ca.key -sha256 -days 1825 -out ca-cert.pem`

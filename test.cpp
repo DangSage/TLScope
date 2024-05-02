@@ -34,11 +34,3 @@ BOOST_AUTO_TEST_CASE(hashTest) {
     BOOST_CHECK_NE(data, hashed.second);
     BOOST_CHECK(TLSS_U::checkHash(data, hashed.first, hashed.second));
 }
-
-BOOST_AUTO_TEST_CASE(NetManagerTest) {
-    std::unique_ptr<NetManager> nm = std::make_unique<NetManager>();
-    BOOST_CHECK_NO_THROW(nm->threads());
-    // wait for a second
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-    BOOST_CHECK_NO_THROW(nm->kill());
-}

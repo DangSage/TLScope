@@ -23,19 +23,9 @@ namespace TLSS_U {
     // gen a key pair for RSA encryption
     extern std::pair<std::string, std::string> genKeyPair();
 
-    // encrypt a file
-    // * Step 1: Encrypt the file
-    // * Step 2: Encrypt the symmetric key
-    // * Step 3: Return the encrypted file info as a map
-    extern std::map<std::string, std::string> encryptFile(
-        const std::string& file_path, const std::string& public_key);
 
-    // decrypt a file
-    // * Step 1: Decrypt the symmetric key
-    // * Step 2: Decrypt the file
-    extern void decryptFile(
-        std::map<std::string, std::string> encrypted_file_info);
-
+    // get the ipv4 address of the current machine
+    extern std::string getLocalIP(int sockfd);
 }
 
 // namespace for user input checking

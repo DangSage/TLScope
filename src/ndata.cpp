@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -14,15 +15,24 @@
 
 #include "network.hpp"
 #include "_constants.hpp"
+#include "_utils.hpp"
+
+std::string TLSS_U::getLocalIP(int sockfd) {
+    struct sockaddr_in localAddress;
+    socklen_t addressLength = sizeof(localAddress);
+
+    if (getsockname(sockfd, (struct sockaddr*)&localAddress, &addressLength) == -1) {
+        perror("getsockname");
+        return "";
+    }
+
+    char buffer[INET_ADDRSTRLEN];
+    const char* p = inet_ntop(AF_INET, &localAddress.sin_addr, buffer, INET_ADDRSTRLEN);
+
+    return p ? std::string(p) : "";
+}
 
 NetManager::NetManager() : _ctxU(nullptr), _uPort(TLSS_C::PORT+10) {
-    char hostname[128];
-    gethostname(hostname, sizeof(hostname));
-    struct hostent* host = gethostbyname(hostname);
-    struct in_addr** addr_list = (struct in_addr**)host->h_addr_list;
-    _ip = inet_ntoa(*addr_list[0]);
-    std::cout << "IP: " << _ip << std::endl;
-
     // create the SSL context
     _ctxU = SSL_CTX_new(DTLS_client_method());
     std::cout << "Creating context..." << std::endl;
@@ -37,10 +47,13 @@ NetManager::NetManager() : _ctxU(nullptr), _uPort(TLSS_C::PORT+10) {
         exit(1);
     }
 
-    udpHandler();
+    // start the UDP client thread
+    _udpClient = std::thread(&NetManager::udpHandler, this);
 }
 
 NetManager::~NetManager() {
+    _running = false;
+    _udpClient.join();
     SSL_CTX_free(_ctxU);
 }
 

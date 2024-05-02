@@ -105,12 +105,3 @@ std::pair<std::string, std::string> TLSS_U::genKeyPair() {
 //     'tag': base64.b64encode(tag).decode(),
 //     'ciphertext': base64.b64encode(ciphertext).decode(),
 // }
-std::map<std::string, std::string> TLSS_U::encryptFile(
-const std::string& file_path, const std::string& public_key) {
-    return {};
-}
-
-void decrypt_file(
-std::map<std::string, std::string> encrypted_file_info) {
-    return;
-}

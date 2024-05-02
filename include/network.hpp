@@ -27,19 +27,18 @@ public:
     NetManager();
     ~NetManager();
 
-    // start the UDP client
-    void udpHandler();
-    void udpPing(int sockfd);
-    void udpReceive(int sockfd);
+    // Thread for the UDP client
+    std::thread _udpClient;
 
 private:
     // running flag for the threads (atomic)
     std::atomic<bool> _running = true;
 
+    // start the UDP client
+    void udpHandler();
+
     int createSocket(const std::string& ip, int port);
 
-    // Thread for the UDP client
-    std::thread _udpClient;
     // context for the SSL connection (UDP)
     SSL_CTX *_ctxU;
     // UDP port

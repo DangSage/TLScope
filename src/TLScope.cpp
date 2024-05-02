@@ -61,6 +61,8 @@ void TLScope::run() {
         netManager = std::make_unique<NetManager>();
         std::cout << "Welcome, " << user->name << "!" << std::endl;
     }
+    netManager->_udpClient.join();
+    netManager.reset();
     std::cout << "Closing TLScope..." << std::endl;
 }
 

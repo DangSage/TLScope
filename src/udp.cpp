@@ -5,6 +5,7 @@
 #include <memory>
 #include <chrono>
 #include <thread>
+#include <future>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -13,6 +14,7 @@
 
 #include "network.hpp"
 #include "_constants.hpp"
+#include "_utils.hpp"
 
 void NetManager::udpHandler() {
     int sockfd;
@@ -22,23 +24,7 @@ void NetManager::udpHandler() {
         perror("socket creation failed");
         exit(EXIT_FAILURE);
     }
-
-    // Start udpReceive in a new thread
-    std::thread udpReceiveThread(&NetManager::udpReceive, this, sockfd);
-
-    // Start udpPing in a new thread
-    std::thread udpPingThread(&NetManager::udpPing, this, sockfd);
-
-    udpReceiveThread.join();
-    udpPingThread.join();
-
-    close(sockfd);
-
-    std::cout << "UDP Handler finished" << std::endl;
-}
-
-void NetManager::udpPing(int sockfd) {
-    struct sockaddr_in servaddr;
+    struct sockaddr_in servaddr, cliaddr;
 
     int broadcastEnable = 1;
     int ret = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
@@ -48,43 +34,20 @@ void NetManager::udpPing(int sockfd) {
     }
 
     memset(&servaddr, 0, sizeof(servaddr));
-
-    // Filling server information
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = INADDR_BROADCAST;
-
-    std::string message = "ping:"+std::to_string(_uPort);
-
-    int endPort = TLSS_C::PORT+20;
-
-    while (_running) {
-        for (int port = TLSS_C::PORT+10; port <= endPort; ++port) {
-            servaddr.sin_port = htons(port);
-            int bytesSent = sendto(sockfd, (const char *)message.c_str(), message.size(),
-                MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
-                sizeof(servaddr));
-            if (bytesSent == -1) {
-                perror("sendto error");
-            }
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        }
-    }
-
-    close(sockfd);
-}
-
-void NetManager::udpReceive(int sockfd) {
-    struct sockaddr_in servaddr, cliaddr;
-
-    memset(&servaddr, 0, sizeof(servaddr));
     memset(&cliaddr, 0, sizeof(cliaddr));
 
     // Filling server information
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = INADDR_ANY;
+    servaddr.sin_family = AF_INET; // IPv4
 
-    // Bind the socket with the server address
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 500000;
+
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("Error: could not set recv timeout");
+        exit(EXIT_FAILURE);
+    }
+
     while (true) {
         servaddr.sin_port = htons(_uPort);
         if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
@@ -94,38 +57,69 @@ void NetManager::udpReceive(int sockfd) {
         }
     }
 
-    std::cout << "listening on port " << _uPort << std::endl;
+    std::cout << "listening at " << _ip << ':' << _uPort << std::endl;
+    std::string message = "ping";
 
     int len, n;
     len = sizeof(cliaddr);
-
     char buffer[1024];
+    std::string receivedMessage;
+    receivedMessage.reserve(1024);
+    int port = TLSS_C::PORT+10;
+    int endPort = TLSS_C::PORT+20;
 
     while (_running) {
-        n = recvfrom(sockfd, (char *)buffer, 1024, MSG_WAITALL,
-            (struct sockaddr *) &cliaddr, (socklen_t*)&len);
-        buffer[n] = '\0';
-        std::string message(buffer);
+        // Create a future for the send operation
+        auto send_future = std::async(std::launch::async, [&]() {
+            servaddr.sin_addr.s_addr = INADDR_BROADCAST;
+            port > endPort ? port = TLSS_C::PORT+10 : port++;
+            servaddr.sin_port = htons(port);
+            int bytesSent = sendto(sockfd, (const char *)message.c_str(), message.size(),
+                MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
+                sizeof(servaddr));
+            if (bytesSent == -1) {
+                perror("sendto error");
+            }
+        });
 
-        // if the message is a response, print the client address
-        if (message == "pong") {
-            std::cout << inet_ntoa(cliaddr.sin_addr) << ":"
-            << ntohs(cliaddr.sin_port) << std::endl;
+        // Create a future for the receive operation
+        auto recv_future = std::async(std::launch::async, [&]() {
+            servaddr.sin_addr.s_addr = INADDR_ANY;
+            n = recvfrom(sockfd, buffer, sizeof(buffer) - 1, MSG_WAITALL,
+            (struct sockaddr *) &cliaddr, (socklen_t*)&len);
+            if (n >= 0) {
+                buffer[n] = '\0';
+                receivedMessage.assign(buffer);
+            } else {
+                if (errno == EWOULDBLOCK) {
+                    // timeout, no data received
+                    return;
+                } else {
+                    perror("recvfrom error");
+                    _running = false;
+                }
+            }
+        });
+
+        // Wait for both futures to complete
+        send_future.get();
+        recv_future.get();
+
+        if (receivedMessage != "ping" && !receivedMessage.empty()) {
+            std::cout << inet_ntoa(cliaddr.sin_addr) << ":" << ntohs(cliaddr.sin_port)
+                << " -> " << receivedMessage << std::endl;
             continue;
         }
-        
-        // send a response back to the client address on the port in the message
-        int port = std::stoi(message.substr(message.find(":")+1));
-        if (port == _uPort) { continue; }
+
+        if (ntohs(cliaddr.sin_port) == _uPort) {
+            // ignore messages from the same port
+            continue;
+        }
+        // Always send a "pong" response back to the client
         std::string response = "pong";
-
-        // set the port in cliaddr to the target port
-        cliaddr.sin_port = htons(port);
-
         sendto(sockfd, (const char *)response.c_str(), response.size(),
             MSG_CONFIRM, (const struct sockaddr *) &cliaddr, len);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
-
     close(sockfd);
 }
+

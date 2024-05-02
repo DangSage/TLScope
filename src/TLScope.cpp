@@ -32,7 +32,7 @@ void TLScope::start() {
 
     char input;
     while (true) {
-        std::cout << ">";
+        std::cout << "$ TLScope> ";
         std::cin >> input;
         input = std::toupper(input);
         if (input == 'Q') {
@@ -48,7 +48,7 @@ void TLScope::start() {
             break;
         } else if (input == 'G') {
             std::string url = "https://github.com/DangSage/TLScope";
-            std::cout << "> visit @" << url << std::endl;
+            std::cout << "$> visit @" << url << std::endl;
         } else {
             std::cout << "Invalid input!" << std::endl;
         }

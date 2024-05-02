@@ -32,7 +32,10 @@ std::string TLSS_U::getLocalIP(int sockfd) {
     return p ? std::string(p) : "";
 }
 
-NetManager::NetManager() : _ctxU(nullptr), _uPort(TLSS_C::PORT+10) {
+NetManager::NetManager(std::string uuid) : _ctxU(nullptr), _uPort(TLSS_C::PORT+10) {
+    auto t = TLSS_U::hash(uuid);
+    _token = t.first + ':' + t.second;
+    std::cout << "Token: " << _token << std::endl;
     // create the SSL context
     _ctxU = SSL_CTX_new(DTLS_client_method());
     std::cout << "Creating context..." << std::endl;

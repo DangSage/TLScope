@@ -15,6 +15,7 @@
 #include "network.hpp"
 #include "_constants.hpp"
 #include "_utils.hpp"
+#include "user.hpp"
 
 void NetManager::udpHandler() {
     int sockfd;
@@ -57,7 +58,6 @@ void NetManager::udpHandler() {
         }
     }
 
-    std::cout << "listening at " << _ip << ':' << _uPort << std::endl;
     std::string message = "ping";
 
     int len, n;
@@ -105,9 +105,18 @@ void NetManager::udpHandler() {
         send_future.get();
         recv_future.get();
 
-        if (receivedMessage != "ping" && !receivedMessage.empty()) {
-            std::cout << inet_ntoa(cliaddr.sin_addr) << ":" << ntohs(cliaddr.sin_port)
-                << " -> " << receivedMessage << std::endl;
+        if (receivedMessage.find("pong:") != std::string::npos) {
+            // std::cout << inet_ntoa(cliaddr.sin_addr) << ":" << ntohs(cliaddr.sin_port)
+            //     << " -> " << receivedMessage << std::endl;
+
+            // add the client to the list of users
+            // * token is the key
+            std::string token = receivedMessage.substr(5);
+            if (_users.find(token) == _users.end()) {
+                _users[token] = std::make_shared<USER>();
+                _users[token]->name = inet_ntoa(cliaddr.sin_addr);
+                _users[token]->name.append(":" + std::to_string(ntohs(cliaddr.sin_port)));
+            }
             continue;
         }
 
@@ -116,7 +125,7 @@ void NetManager::udpHandler() {
             continue;
         }
         // Always send a "pong" response back to the client
-        std::string response = "pong";
+        std::string response = "pong:" + _token;
         sendto(sockfd, (const char *)response.c_str(), response.size(),
             MSG_CONFIRM, (const struct sockaddr *) &cliaddr, len);
     }

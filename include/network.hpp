@@ -24,15 +24,16 @@ class USER;
 // ** TCP connections for sending and receiving messages (TLS)
 class NetManager {
 public:
-    NetManager();
+    explicit NetManager(std::string uuid);
     ~NetManager();
 
     // Thread for the UDP client
     std::thread _udpClient;
+    std::map<std::string, std::shared_ptr<USER>> _users;
 
-private:
     // running flag for the threads (atomic)
     std::atomic<bool> _running = true;
+private:
 
     // start the UDP client
     void udpHandler();
@@ -46,6 +47,8 @@ private:
 
     std::string _ip;
     std::string _token;
+
+    std::map<std::string, std::shared_ptr<USER>> known_users;
 };
 
 #endif // _TLSS_NETWORK_HPP_4204

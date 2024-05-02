@@ -12,13 +12,15 @@
 // * Will be used to save and load user data
 // * Will store user data including the main user and users that are online
 struct USER {
-    std::string name;
-    std::string email;
+    // * name for unknown users is their socket
+    // * name for known users is their username
+    std::string name = "?";
+    std::string email = "?";
     std::string hashedPassword;
     int color;
 
     // std::vector<std::string> character;
-    std::string uuid;
+    std::string uuid = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX";
 
     // encoding and decoding functions
     template <class Archive>

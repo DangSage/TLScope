@@ -58,19 +58,26 @@ void TLScope::run() {
     start();
     // if user is logged in, start the main program
     if (user != nullptr) {
-        netManager = std::make_unique<NetManager>();
+        netManager = std::make_unique<NetManager>(user->uuid);
         std::cout << "Welcome, " << user->name << "!" << std::endl;
+        shell();
     }
     netManager->_udpClient.join();
     netManager.reset();
     std::cout << "Closing TLScope..." << std::endl;
 }
 
-void TLScope::getUserData() {
-    std::cout << "USER DATA:" << std::endl;
-    TLSS_U::displayList(std::map<std::string, std::any> {
-        {"name", user->name},
-        {"email", user->email},
-        {"uuid", user->uuid}
-    });
+bool TLScope::getUserData() {
+    try {
+        std::cout << "USER DATA:" << std::endl;
+        TLSS_U::displayList(std::map<std::string, std::any> {
+            {"name", user->name},
+            {"email", user->email},
+            {"uuid", user->uuid}
+        });
+    } catch (const std::exception &e) {
+        std::cerr << "Error getting user data: " << e.what() << std::endl;
+        return false;
+    }
+    return true;
 }

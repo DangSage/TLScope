@@ -33,15 +33,17 @@ public:
     bool loginUser();
 
     // get user data in a formatted tree
-    void getUserData();
+    bool getUserData();
+
+    // shell for the user, with commands
+    void shell();
 private:
     bool newUser = false;
     std::shared_ptr<USER> user;
-    std::map<std::string, std::shared_ptr<USER>> registered_users;
-    std::map<std::string, std::shared_ptr<USER>> online_users;
 
     // network manager
     std::unique_ptr<NetManager> netManager;
+    std::map<std::string, std::shared_ptr<USER>> registered_users;
 };
 
 #endif // _TLSS_MAIN_HPP_4204

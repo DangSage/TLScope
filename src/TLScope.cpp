@@ -1,12 +1,13 @@
 // Main wrapper for the entire program
-#include "TLScope.hpp"
-#include "user.hpp"
-#include "_utils.hpp"
-#include "_constants.hpp"
+
 #include <iostream>
 #include <string>
 #include <map>
 
+#include "TLScope.hpp"
+#include "user.hpp"
+#include "_utils.hpp"
+#include "_constants.hpp"
 
 TLScope::TLScope(): user(nullptr), netManager(nullptr) {
     registered_users = buildRegisteredUsers();

@@ -13,9 +13,9 @@ all: TLScope
 TLScope: main.cpp $(OBJ)
 	$(CC) $(CFLAGS) -o TLScope main.cpp $(OBJ) $(LIBS)
 
-test: test.cpp $(OBJ)
-	$(CC) $(CFLAGS) -o test test.cpp $(OBJ) $(LIBS)
-	./test
+# test: test.cpp $(OBJ)
+# 	$(CC) $(CFLAGS) -o test test.cpp $(OBJ) $(LIBS)
+# 	./test
 
 bin/%.o: src/%.cpp
 	$(CC) $(CFLAGS) -c $< -o $@ $(LIBS)
@@ -24,9 +24,6 @@ bin/%.d: src/%.cpp
 	$(CC) $(CFLAGS) -MM -MT '$(patsubst src/%.cpp,bin/%.o,$<)' $< -MF $@ $(LIBS)
 
 -include $(DEP_FILES)
-
-debug:
-	gdb ./test
 
 clean:
 	rm -f bin/*.o bin/*.d TLScope test

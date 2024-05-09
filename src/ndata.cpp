@@ -34,21 +34,59 @@ std::string TLSS_U::getLocalIP(int sockfd) {
 
 NetManager::NetManager(std::string uuid) : _ctxT(nullptr), _uPort(TLSS_C::PORT+10),
     _uSocket(-1) {
+    // ** TLS Setup ===========================================================
+
     auto t = TLSS_U::hash(uuid);
     _token = t.first + ':' + t.second;
     std::cout << "Token: " << _token << std::endl;
     // create the SSL context
     _ctxT = SSL_CTX_new(TLS_client_method());
-    std::cout << "Creating context..." << std::endl;
     if (_ctxT == nullptr) {
         ERR_print_errors_fp(stderr);
         exit(1);
     }
-    std::cout << "SSL context created" << std::endl;
 
     if (!SSL_CTX_load_verify_locations(_ctxT, "ca-cert.pem", nullptr)) {
         ERR_print_errors_fp(stderr);
         exit(1);
+    }
+
+    // ** UDP Setup ===========================================================
+
+    if ((_uSocket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    int broadcastEnable = 1;
+    int ret = setsockopt(_uSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+    if (ret) {
+        perror("Error: could not enable broadcast option on socket");
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&servaddr, 0, sizeof(servaddr));
+    memset(&cliaddr, 0, sizeof(cliaddr));
+
+    // Filling server information
+    servaddr.sin_family = AF_INET; // IPv4
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 500000;
+
+    if (setsockopt(_uSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("Error: could not set recv timeout");
+        exit(EXIT_FAILURE);
+    }
+
+    while (true) {
+        servaddr.sin_port = htons(_uPort);
+        if (bind(_uSocket, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+            servaddr.sin_port = htons(_uPort++);
+        } else {
+            break;
+        }
     }
 
     // start the UDP client thread

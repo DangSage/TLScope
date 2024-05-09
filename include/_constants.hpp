@@ -3,6 +3,7 @@
 #define _TLSS_CONSTANTS_HPP_4204
 
 #include <string>
+#include <array>
 
 // constants for the TLScope project
 namespace TLSS_C {
@@ -27,6 +28,7 @@ const std::string_view TITLE_ART =
 const std::string SAVE_DIR = "data/";
 const std::string SAVE_EXT = ".tlss";
 const int PORT = 3000;
+
 }
 
 #endif //._TLSS_CONSTANTS_HPP_4204

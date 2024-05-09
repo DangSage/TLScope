@@ -38,14 +38,15 @@ void TLScope::shell() {
                 return;
             }
             std::cout << "\033[32mUsers on the network:\033[0m" << std::endl;
-            for (auto& [uuid, user] : netManager->_users) {
-                TLSS_U::displayList(std::map<std::string, std::any> {
+            std::map<std::string, std::any> usersMap;
+            for (auto& [token, user] : netManager->_users) {
+                usersMap[user->IPP] = std::map<std::string, std::any> {
                     {"name", user->name},
                     {"email", user->email},
-                    {"uuid", user->uuid}
-                });
+                    {"token", token.substr(0,16)}
+                };
             }
-            std::cout << std::endl;
+            std::cout << TLSS_U::displayList(usersMap) << std::endl;
         }}
     };
 

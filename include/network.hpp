@@ -14,6 +14,9 @@
 #include <thread>
 #include <map>
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+
 // forward declarations
 class USER;
 
@@ -34,12 +37,9 @@ public:
     // running flag for the threads (atomic)
     std::atomic<bool> _running = true;
 private:
-    // start the UDP client
-    void udpHandler();
-
-    // context for the SSL connection (TLS/TCP)
+    struct sockaddr_in servaddr, cliaddr;
     SSL_CTX *_ctxT;
-    // UDP port
+
     int _uPort;
     int _uSocket;
 
@@ -47,6 +47,9 @@ private:
     std::string _token;
 
     std::map<std::string, std::shared_ptr<USER>> known_users;
+
+    // start the UDP client
+    void udpHandler();
 };
 
 #endif // _TLSS_NETWORK_HPP_4204

@@ -8,31 +8,30 @@
 #include <map>
 #include <any>
 
-std::string TLSS_U::displayList(std::map<std::string, std::any> 
-    data_dict, std::string prefix) {
+std::string TLSS_U::displayList(const std::map<std::string, std::any>& data_dict, std::string prefix) {
     std::stringstream ss;
     if (data_dict.empty()) {
         ss << prefix << " └─No items.\n";
-    } else {
-        size_t i = 0;
-        for (auto& kv : data_dict) {
-            std::string key = kv.first;
-            std::string new_prefix = prefix + 
-                ((i == data_dict.size() - 1) ? "  " : " │");
-            if (kv.second.type() == typeid(std::map<std::string, std::any>)) {
-                ss << prefix << ((i == data_dict.size() - 1) ? " └─" : " ├─") 
-                    << key << ":\n";
-                ss << displayList(
-                    std::any_cast<std::map<std::string, std::any>>(kv.second),
-                    new_prefix + "  ");
-            } else {
-                ss << prefix << ((i == data_dict.size() - 1) ? " └─" : " ├─")
-                    << key << ": " << std::any_cast<std::string>(kv.second) << "\n";
-            }
-            i++;
-        }
+        return ss.str();
     }
-    std::cout << ss.str();
+
+    auto it = data_dict.begin();
+    while (it != data_dict.end()) {
+        std::string key = it->first;
+        std::string new_prefix = prefix + ((std::next(it) == data_dict.end()) ? "  " : " │");
+
+        ss << prefix << ((std::next(it) == data_dict.end()) ? " └─" : " ├─") << key;
+        // display ss.str() in color
+
+        if (it->second.type() == typeid(std::map<std::string, std::any>)) {
+            const std::map<std::string, std::any>& nested_map = std::any_cast<const std::map<std::string, std::any>&>(it->second);
+            ss << ":" << std::endl << displayList(nested_map, new_prefix + "  ");
+        } else {
+            ss << ": " << std::any_cast<std::string>(it->second) << std::endl;
+        }
+        ++it;
+    }
+
     return ss.str();
 }
 

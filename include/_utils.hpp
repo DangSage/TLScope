@@ -11,7 +11,7 @@
 
 namespace TLSS_U {
     // display a list of items in a map
-    std::string displayList(std::map<std::string, std::any> data_dict, std::string prefix="");
+    std::string displayList(const std::map<std::string, std::any>& data_dict, std::string prefix="");
 
     // salt and hash a piece of data using SHA256
     // * returns a pair of strings: the salt and the hashed data

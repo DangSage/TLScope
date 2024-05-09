@@ -81,6 +81,8 @@ bool TLScope::registerUser() {
             return false;
         }
 
+        user->uuid = _rand::uuid();
+
         auto it = std::find_if(registered_users.begin(), registered_users.end(),
         [&](std::pair<std::string, std::shared_ptr<USER>> pair) {
             return pair.second->email == user->email;

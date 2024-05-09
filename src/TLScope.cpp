@@ -73,11 +73,12 @@ void TLScope::run() {
 bool TLScope::getUserData() {
     try {
         std::cout << "My user data:" << std::endl;
-        TLSS_U::displayList(std::map<std::string, std::any> {
+        auto data = TLSS_U::displayList(std::map<std::string, std::any> {
             {"name", user->name},
             {"email", user->email},
             {"uuid", user->uuid}
         });
+        std::cout << data << std::endl;
     } catch (const std::exception &e) {
         std::cerr << "Error getting user data: " << e.what() << std::endl;
         return false;

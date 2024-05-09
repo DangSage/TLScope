@@ -12,8 +12,6 @@
 // * Will be used to save and load user data
 // * Will store user data including the main user and users that are online
 struct USER {
-    // * name for unknown users is their socket
-    // * name for known users is their username
     std::string name = "?";
     std::string email = "?";
     std::string hashedPassword;
@@ -21,6 +19,13 @@ struct USER {
 
     // std::vector<std::string> character;
     std::string uuid = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX";
+
+    // ! Don't use on the client side
+    std::string token;
+
+    // ip port pair
+    // ** Used as a network identifier
+    std::string IPP = "0.0.0.0:X";
 
     // encoding and decoding functions
     template <class Archive>

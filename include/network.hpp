@@ -50,6 +50,14 @@ private:
 
     // start the UDP client
     void udpHandler();
+
+    void removeInactiveUsers();
+
+    std::shared_ptr<USER> createUser(const std::string& token, const sockaddr_in& cliaddr);
 };
+
+// In your main function or wherever this code block is located
+const std::string PONG_PREFIX = "pong:";
+
 
 #endif // _TLSS_NETWORK_HPP_4204

@@ -7,6 +7,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <chrono>
 
 // user class for the user data
 // * Will be used to save and load user data
@@ -26,6 +27,9 @@ struct USER {
     // ip port pair
     // ** Used as a network identifier
     std::string IPP = "0.0.0.0:X";
+    // Last time the user pinged online
+    // ** Used to determine if the user is still online
+    std::chrono::time_point<std::chrono::system_clock> lastHeartbeat;
 
     // encoding and decoding functions
     template <class Archive>

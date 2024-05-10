@@ -137,7 +137,7 @@ bool TLScope::loginUser() {
         }
 
         if (!TLSS_U::checkHash(attempt, salt, hash)) {
-            std::cerr << "!Invalid email or password!" << std::endl;
+            std::cerr << "Invalid email or password!" << std::endl;
             continue;
         }
 

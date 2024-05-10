@@ -16,6 +16,7 @@
 #include "network.hpp"
 #include "_constants.hpp"
 #include "_utils.hpp"
+#include "user.hpp"
 
 std::string TLSS_U::getLocalIP(int sockfd) {
     struct sockaddr_in localAddress;
@@ -97,4 +98,21 @@ NetManager::~NetManager() {
     _running = false;
     _udpClient.join();
     SSL_CTX_free(_ctxT);
+}
+
+void NetManager::removeInactiveUsers() {
+    for(auto it = _users.begin(); it != _users.end(); ) {
+        if (it->second->lastHeartbeat < std::chrono::system_clock::now() - std::chrono::seconds(2)) {
+            it = _users.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+std::shared_ptr<USER> NetManager::createUser(const std::string& token, const sockaddr_in& cliaddr) {
+    USER user;
+    user.name = "\"User "+std::to_string(_users.size())+"\"";
+    user.IPP = std::string(inet_ntoa(cliaddr.sin_addr)) + ":" + std::to_string(ntohs(cliaddr.sin_port));
+    return std::make_shared<USER>(user);
 }

@@ -43,7 +43,7 @@ void TLScope::shell() {
                 usersMap[user->IPP] = std::map<std::string, std::any> {
                     {"name", user->name},
                     {"email", user->email},
-                    {"token", token.substr(0,16)}
+                    {"token", token.substr(0,16)+".."}
                 };
             }
             std::cout << TLSS_U::displayList(usersMap) << std::endl;

@@ -23,9 +23,7 @@ namespace TLSS_U {
     // gen a key pair for RSA encryption
     extern std::pair<std::string, std::string> genKeyPair();
 
-
-    // get the ipv4 address of the current machine
-    extern std::string getLocalIP(int sockfd);
+    extern std::string getLocalIP();
 }
 
 // namespace for user input checking

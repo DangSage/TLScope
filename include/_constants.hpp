@@ -4,6 +4,7 @@
 
 #include <string>
 #include <array>
+#include <regex>
 
 // constants for the TLScope project
 namespace TLSS_C {
@@ -29,6 +30,7 @@ const std::string SAVE_DIR = "data/";
 const std::string SAVE_EXT = ".tlss";
 const int PORT = 3000;
 
+const std::regex email_regex(R"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})");
 }
 
 #endif //._TLSS_CONSTANTS_HPP_4204

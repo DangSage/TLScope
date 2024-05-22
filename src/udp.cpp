@@ -21,62 +21,30 @@
 void NetManager::udpHandler() {
     int len, n;
     len = sizeof(cliaddr);
-    char buffer[1024];
-    std::string receivedMessage;
     receivedMessage.reserve(1024);
-    int port = TLSS_C::PORT+10;
-    int endPort = TLSS_C::PORT+20;
 
     while (_running) {
         removeInactiveUsers();
 
         // Create a future for the ping
-        auto send_future = std::async(std::launch::async, [&]() {
-            servaddr.sin_addr.s_addr = INADDR_BROADCAST;
-            port > endPort ? port = TLSS_C::PORT+10 : port++;
-            servaddr.sin_port = htons(port);
-            const char* message = "ping";
-            int bytesSent = sendto(_uSocket, message, strlen(message),
-                MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
-                sizeof(servaddr));
-            if (bytesSent == -1) {
-                perror("sendto error");
-            }
-        });
+        auto send_future = sendPing();
 
         // Create a future for the receive operation
-        auto recv_future = std::async(std::launch::async, [&]() {
-            servaddr.sin_addr.s_addr = INADDR_ANY;
-            n = recvfrom(_uSocket, buffer, sizeof(buffer) - 1, MSG_WAITALL,
-            (struct sockaddr *) &cliaddr, (socklen_t*)&len);
-            if (n >= 0) {
-                buffer[n] = '\0';
-                receivedMessage.assign(buffer);
-            } else {
-                if (errno == EWOULDBLOCK) {
-                    // timeout, no data received
-                    return;
-                } else {
-                    perror("recvfrom error");
-                    _running = false;
-                }
-            }
-        });
+        auto recv_future = receivePong(n, len);
 
         // Wait for both futures to complete
         send_future.get();
         recv_future.get();
 
+        if (ntohs(cliaddr.sin_port) == _uPort) {
+            continue;
+        }
         if (receivedMessage.find(PONG_PREFIX) != std::string::npos) {
             std::string token = receivedMessage.substr(PONG_PREFIX.size());
             if (_users.find(token) == _users.end()) {
                 _users[token] = createUser(token, cliaddr);
             }
             _users[token]->lastHeartbeat = std::chrono::system_clock::now();
-        }
-
-        if (ntohs(cliaddr.sin_port) == _uPort) {
-            continue;
         }
 
         std::string response = PONG_PREFIX + _token;
@@ -86,3 +54,50 @@ void NetManager::udpHandler() {
     close(_uSocket);
 }
 
+
+std::future<int> NetManager::sendPing() {
+    return std::async(std::launch::async, [&]() {
+        servaddr.sin_addr.s_addr = inet_addr("224.0.0.1"); // replace with your multicast address
+        servaddr.sin_port = htons(_uPort);
+        const char* message = "ping";
+
+        // Set the multicast TTL
+        unsigned char multicastTTL = 3; // adjust as needed
+        if (setsockopt(_uSocket, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &multicastTTL, sizeof(multicastTTL)) < 0) {
+            perror("setsockopt - IP_MULTICAST_TTL");
+            return -1;
+        }
+
+        int bytesSent = sendto(_uSocket, message, strlen(message),
+            MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
+            sizeof(servaddr));
+        if (bytesSent == -1) {
+            perror("sendto error");
+        }
+        return bytesSent;
+    });
+}
+
+std::future<int> NetManager::receivePong(int& n, int& len) {
+    return std::async(std::launch::async, [&]() {
+        servaddr.sin_addr.s_addr = INADDR_ANY;
+        char buffer[1024];
+        len = sizeof(cliaddr);
+
+        n = recvfrom(_uSocket, buffer, sizeof(buffer) - 1, MSG_WAITALL,
+        (struct sockaddr *) &cliaddr, (socklen_t*)&len);
+        if (n >= 0) {
+            buffer[n] = '\0';
+            receivedMessage.assign(buffer);
+        } else {
+            if (errno == EWOULDBLOCK) {
+                // timeout, no data received
+                return n;
+            } else {
+                perror("recvfrom error");
+                _running = false;
+            }
+        }
+        return n;
+    });
+}

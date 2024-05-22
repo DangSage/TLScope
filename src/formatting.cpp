@@ -1,12 +1,15 @@
 // Display formatting functions for the user interface.
-#include "_utils.hpp"
-#include "user.hpp"
+
 #include <string>
 #include <sstream>
 #include <iostream>
 #include <regex>
 #include <map>
 #include <any>
+
+#include "_utils.hpp"
+#include "user.hpp"
+#include "_constants.hpp"
 
 std::string TLSS_U::displayList(const std::map<std::string, std::any>& data_dict, std::string prefix) {
     std::stringstream ss;
@@ -42,8 +45,7 @@ bool TLSS_I::validEmail(std::string& email) {
         std::getline(std::cin, email);
         // return true;
         // regex check for email
-        if (std::regex_match(email, 
-        std::regex(R"(\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b)"))) {
+        if (std::regex_match(email, TLSS_C::email_regex)) {
             return true;
         } else if (email == "q") {
             return false;

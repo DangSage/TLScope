@@ -122,7 +122,7 @@ bool TLScope::loginUser() {
             if (!TLSS_U::checkHash(attempt, dummyHash.first, dummyHash.second)) {
                 // nothing to do here, dummyHash is just a placeholder
             }
-            std::cerr << "Invalid email or password!" << std::endl;
+            std::cerr << "Invalid email password combination!\n";
             continue;
         }
 
@@ -137,7 +137,7 @@ bool TLScope::loginUser() {
         }
 
         if (!TLSS_U::checkHash(attempt, salt, hash)) {
-            std::cerr << "Invalid email or password!" << std::endl;
+            std::cerr << "Invalid email password combination!\n";
             continue;
         }
 

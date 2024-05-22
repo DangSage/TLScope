@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
 #include <netdb.h>
 #include <unistd.h>
 
@@ -18,22 +19,7 @@
 #include "_utils.hpp"
 #include "user.hpp"
 
-std::string TLSS_U::getLocalIP(int sockfd) {
-    struct sockaddr_in localAddress;
-    socklen_t addressLength = sizeof(localAddress);
-
-    if (getsockname(sockfd, (struct sockaddr*)&localAddress, &addressLength) == -1) {
-        perror("getsockname");
-        return "";
-    }
-
-    char buffer[INET_ADDRSTRLEN];
-    const char* p = inet_ntop(AF_INET, &localAddress.sin_addr, buffer, INET_ADDRSTRLEN);
-
-    return p ? std::string(p) : "";
-}
-
-NetManager::NetManager(std::string uuid) : _ctxT(nullptr), _uPort(TLSS_C::PORT+10),
+NetManager::NetManager(std::string uuid) : _ctxT(nullptr), _uPort(TLSS_C::PORT),
     _uSocket(-1) {
     // ** TLS Setup ===========================================================
 
@@ -59,10 +45,10 @@ NetManager::NetManager(std::string uuid) : _ctxT(nullptr), _uPort(TLSS_C::PORT+1
         exit(EXIT_FAILURE);
     }
 
-    int broadcastEnable = 1;
-    int ret = setsockopt(_uSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
-    if (ret) {
-        perror("Error: could not enable broadcast option on socket");
+    mreq.imr_multiaddr.s_addr = inet_addr("224.0.0.1"); // replace with your multicast address
+    mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+    if (setsockopt(_uSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *) &mreq, sizeof(mreq)) < 0) {
+        perror("setsockopt - IP_ADD_MEMBERSHIP");
         exit(EXIT_FAILURE);
     }
 
@@ -90,8 +76,12 @@ NetManager::NetManager(std::string uuid) : _ctxT(nullptr), _uPort(TLSS_C::PORT+1
         }
     }
 
+    _ip = TLSS_U::getLocalIP();
+
     // start the UDP client thread
     _udpClient = std::thread(&NetManager::udpHandler, this);
+
+    std::cout << "Hosting on: " << _ip << ":" << _uPort << std::endl;
 }
 
 NetManager::~NetManager() {
@@ -112,7 +102,33 @@ void NetManager::removeInactiveUsers() {
 
 std::shared_ptr<USER> NetManager::createUser(const std::string& token, const sockaddr_in& cliaddr) {
     USER user;
-    user.name = "\"User "+std::to_string(_users.size())+"\"";
+    user.name = "\"User "+std::to_string(_users.size()+1)+"\"";
     user.IPP = std::string(inet_ntoa(cliaddr.sin_addr)) + ":" + std::to_string(ntohs(cliaddr.sin_port));
     return std::make_shared<USER>(user);
+}
+
+std::string TLSS_U::getLocalIP() {
+    struct ifaddrs * ifAddrStruct = NULL;
+    struct ifaddrs * ifa = NULL;
+    void * tmpAddrPtr = NULL;
+
+    getifaddrs(&ifAddrStruct);
+
+    for (ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr) {
+            continue;
+        }
+        // check it is IP4
+        if (ifa->ifa_addr->sa_family == AF_INET) { 
+            tmpAddrPtr = &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
+            char addressBuffer[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
+            if (strcmp(ifa->ifa_name, "lo") != 0) { // exclude loopback
+                if (ifAddrStruct != NULL) freeifaddrs(ifAddrStruct);
+                return std::string(addressBuffer);
+            }
+        }
+    }
+    if (ifAddrStruct != NULL) freeifaddrs(ifAddrStruct);
+    return "";
 }

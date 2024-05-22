@@ -11,6 +11,7 @@
 #include <mutex>
 #include <vector>
 #include <atomic>
+#include <future>
 #include <thread>
 #include <map>
 
@@ -40,16 +41,22 @@ private:
     struct sockaddr_in servaddr, cliaddr;
     SSL_CTX *_ctxT;
 
+    struct ip_mreq mreq;
+
     int _uPort;
     int _uSocket;
 
     std::string _ip;
     std::string _token;
 
+    std::string receivedMessage;
+
     std::map<std::string, std::shared_ptr<USER>> known_users;
 
     // start the UDP client
     void udpHandler();
+    std::future<int> sendPing();
+    std::future<int> receivePong(int& n, int& len);
 
     void removeInactiveUsers();
 

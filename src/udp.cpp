@@ -59,7 +59,6 @@ std::future<int> NetManager::sendPing() {
     return std::async(std::launch::async, [&]() {
         servaddr.sin_addr.s_addr = inet_addr("224.0.0.1"); // replace with your multicast address
         servaddr.sin_port = htons(_uPort);
-        const char* message = "ping";
 
         // Set the multicast TTL
         unsigned char multicastTTL = 3; // adjust as needed
@@ -68,7 +67,7 @@ std::future<int> NetManager::sendPing() {
             return -1;
         }
 
-        int bytesSent = sendto(_uSocket, message, strlen(message),
+        int bytesSent = sendto(_uSocket, "ʀ", strlen("ʀ"),
             MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
             sizeof(servaddr));
         if (bytesSent == -1) {
@@ -98,6 +97,23 @@ std::future<int> NetManager::receivePong(int& n, int& len) {
                 _running = false;
             }
         }
+
+        if (inet_ntoa(cliaddr.sin_addr) == _ip) {
+            return n;
+        }
+
+        const std::string response = "ʁ" + _token;
+        sendto(_uSocket, (const char *)response.c_str(), response.size(),
+            MSG_CONFIRM, (const struct sockaddr *) &cliaddr, len);
+
+        // if the message is not a pong message, return
+        if (receivedMessage.find("ʁ") == std::string::npos) {
+            return n;
+        }
+
+        // std::cout << "Received " << receivedMessage 
+        //     << ": " << inet_ntoa(cliaddr.sin_addr) << std::endl;
+
         return n;
     });
 }

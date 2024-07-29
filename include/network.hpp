@@ -55,7 +55,11 @@ private:
 
     // start the UDP client
     void udpHandler();
+
+    // send a ping/pong message
     std::future<int> sendPing();
+
+    // receive a ping/pong message
     std::future<int> receivePong(int& n, int& len);
 
     void removeInactiveUsers();

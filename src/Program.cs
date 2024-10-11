@@ -1,9 +1,7 @@
-﻿
-using TLScope.src.Models;
+﻿using TLScope.src.Models;
 using TLScope.src.Services;
 using System;
-
-// main class of the program
+using System.Threading.Tasks;
 
 namespace TLScope
 {
@@ -11,26 +9,17 @@ namespace TLScope
     {
         static void Main(string[] args)
         {
-            // create a new instance of the NetworkService class
+            // Call the asynchronous method and wait for it to complete
+            MainAsync(args).GetAwaiter().GetResult();
+        }
+
+        static async Task MainAsync(string[] args)
+        {
+            // Create a new instance of the NetworkService class
             NetworkService networkService = new();
 
-            // call the DiscoverLocalNetwork method to discover devices on the local network
-            networkService.DiscoverLocalNetwork();
-
-            // create a new user object
-            User user = new()
-            {
-                Username = "john_doe",
-                Password = "password123",
-                Email = "",
-                Role = "admin",
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
-            };
-
-            // print the user object
-            Console.WriteLine(user);
-            return;
+            // Call the DiscoverLocalNetworkAsync method to discover devices on the local network
+            await networkService.DiscoverLocalNetworkAsync();
         }
     }
 }

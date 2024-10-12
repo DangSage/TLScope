@@ -7,73 +7,59 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-namespace TLScope.src.Services
-{
+namespace TLScope.src.Services {
     /// <summary>
     /// Provides network-related operations such as network discovery and monitoring.
     /// </summary>
-    public class NetworkService
-    {
+    public class NetworkService {
         /// <summary>
         /// Discovers devices on the local network using ARP scanning and ICMP pinging.
         /// </summary>
-        public async Task DiscoverLocalNetworkAsync()
-        {
-            var localIp = GetLocalIPAddress();
-            Console.WriteLine($"Local IP Address: {localIp}");
-            var subnetMask = GetSubnetMask(localIp);
-            var ipRange = GetIPRange(localIp, subnetMask);
+        
+        public ConcurrentDictionary<string, bool> activeDevices = new();
 
-            ConcurrentDictionary<string, bool> activeDevices = new();
+        public string? LocalIPAddress { get; private set; }
 
-            // ARP Scanning with Parallel Processing
-            var scanningTask = Task.Run(async () =>
-            {
-                while (true)
-                {
-                    Parallel.ForEach(ipRange, ip =>
-                    {
-                        if (IsDeviceActive(ip))
-                        {
-                            activeDevices.AddOrUpdate(ip, true, (key, oldValue) => true);
-                        } else {
+        public async Task DiscoverLocalNetworkAsync() {
+            try {
+                LocalIPAddress = GetLocalIPAddress();
+                var subnetMask = GetSubnetMask(LocalIPAddress);
+                var ipRange = GetIPRange(LocalIPAddress, subnetMask);
+
+                // ARP Scanning with Parallel Processing
+                var scanningTask = Task.Run(async () => {
+                    while (true) {
+                        if (activeDevices.Count < 16) {
+                            Parallel.ForEach(ipRange, ip => {
+                                if (IsDeviceActive(ip)) {
+                                    activeDevices.AddOrUpdate(ip, true, (key, oldValue) => true);
+                                }
+                            });
                         }
-                    });
-
-                    if (activeDevices.Count >= 25) // Limit the number of active devices to 25
-                    {
-                        Console.WriteLine("Maximum number of active devices reached. Stopping scan.");
-                        break;
+                        await Task.Delay(5000); // Delay for 5 seconds before next scan
                     }
-                    await Task.Delay(5000); // Delay for 5 seconds before next scan
-                }
-            });
+                });
 
-            // ICMP Pinging for verification with Parallel Processing
-            var pingingTask = Task.Run(async () =>
-            {
-                while (true)
-                {
-                    Parallel.ForEach(activeDevices.Keys, ip =>
-                    {
-                        Ping ping = new Ping();
-                        PingReply reply = ping.Send(ip, 200); // Reduced timeout to 200 ms
+                // ICMP Pinging for verification with Parallel Processing
+                var pingingTask = Task.Run(async () => {
+                    while (true) {
+                        Parallel.ForEach(activeDevices.Keys, ip => {
+                            Ping ping = new Ping();
+                            PingReply reply = ping.Send(ip, 1000);
 
-                        if (reply.Status == IPStatus.Success)
-                        {
-                            Console.WriteLine($"Ping successful to {ip}, {reply.RoundtripTime} ms");
-                        }
-                        else
-                        {
-                            activeDevices.TryUpdate(ip, false, true);
-                        }
-                    });
-                    await Task.Delay(5000); // Delay for 5 seconds before next ping
-                }
-            });
+                            if (reply.Status != IPStatus.Success) {
+                                activeDevices.TryRemove(ip, out _);
+                            }
+                        });
+                        await Task.Delay(5000); // Delay for 5 seconds before next ping
+                    }
+                });
 
-            // Wait for both tasks to complete (they won't, as they run indefinitely)
-            await Task.WhenAll(scanningTask, pingingTask);
+                // Wait for both tasks to complete (they won't, as they run indefinitely)
+                await Task.WhenAll(scanningTask, pingingTask);
+            } catch (Exception ex) {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+            }            
         }
 
         private static string GetLocalIPAddress()
@@ -93,7 +79,7 @@ namespace TLScope.src.Services
                     }
                 }
             }
-            throw new Exception("Local IP Address Not Found!");
+            throw new Exception($"Local IP Address Not Found!\nAre you connected to WiFi?");
         }
 
         private static string GetSubnetMask(string ipAddress)
@@ -143,8 +129,7 @@ namespace TLScope.src.Services
             }
         }
 
-        private static bool IsDeviceActive(string ipAddress)
-        {
+        private static bool IsDeviceActive(string ipAddress) {
             try
             {
                 Ping ping = new();

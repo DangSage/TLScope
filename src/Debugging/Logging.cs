@@ -4,16 +4,16 @@ using System.Runtime.CompilerServices;
 
 namespace TLScope.src.Debugging {
     public static class Logging {
-        private static readonly string logPath = Path.Combine(Environment.CurrentDirectory, "logs");
-        private static readonly string logFile = Path.Combine(logPath, "tlscope.log");
+        private static readonly string logFile = Path.Combine(Environment.CurrentDirectory, "tlscope.log");
 
         static Logging() {
-            if (!Directory.Exists(logPath)) {
-                Directory.CreateDirectory(logPath);
-                MakeLogFileWritable();
+            // if log file already exists (contains data), append 2 new lines
+            using StreamWriter sw = new(logFile, true);
+            if (sw.BaseStream.Length > 0) {
+                sw.WriteLine();
+                sw.WriteLine();
             }
-            using StreamWriter sw = new(logFile, true);  // Append mode
-            sw.WriteLine($"\n\n======= Logging Session. {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} =======");
+            sw.WriteLine($"======= Logging Session. {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} =======");
         }
 
         public static void Write(string message, 

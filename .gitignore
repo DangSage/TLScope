@@ -19,3 +19,6 @@ bld/
 [Oo]bj/
 *FileListAbsolute.txt
 *assets.cache
+
+# Misc
+*.log

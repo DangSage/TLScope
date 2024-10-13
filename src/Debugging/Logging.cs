@@ -13,7 +13,7 @@ namespace TLScope.src.Debugging {
                 MakeLogFileWritable();
             }
             using StreamWriter sw = new(logFile, true);  // Append mode
-            sw.WriteLine($"\n======= Logging Session. {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} =======");
+            sw.WriteLine($"\n\n======= Logging Session. {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} =======");
         }
 
         public static void Write(string message, 

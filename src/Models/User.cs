@@ -1,10 +1,6 @@
-// module to define the User model in the database
-// the User model class will be the backend data of the User table in the database
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TLScope.src.Models
 {
@@ -15,30 +11,43 @@ namespace TLScope.src.Models
 
         [Required]
         [StringLength(50)]
-        public string? Username { get; set; }
+        public string Username { get; set; } = string.Empty;
 
         [Required]
         [StringLength(50)]
-        public string? Password { get; set; }
+        public string Password { get; set; } = string.Empty;
 
         [Required]
         [StringLength(50)]
-        public string? Email { get; set; }
+        public string Email { get; set; } = string.Empty;
 
         [Required]
         [StringLength(50)]
-        public string? Role { get; set; }
+        public string Role { get; set; } = string.Empty;
 
-        public DateTime CreatedAt { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        public DateTime UpdatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        // public List<Note>? Notes { get; set; }
+        // Navigation property
+        public virtual ICollection<Device> Devices { get; set; } = new List<Device>();
 
-        // when the object is printed, return all the properties of the object
-        public override string ToString()
-        {
-            return $"Id: {Id}\nUsername: {Username}\nPassword: {Password}\nEmail: {Email}\nRole: {Role}\nCreatedAt: {CreatedAt}\nUpdatedAt: {UpdatedAt}";
-        }
+        // Device counter
+        public int DeviceCount => Devices.Count;
+
+        // * Temporary addition for testing
+        //         public override string ToString()
+        //         {
+        //             return $@"
+        // Id: {Id}
+        // Username: {Username}
+        // Password: {Password}
+        // Email: {Email}
+        // Role: {Role}
+        // CreatedAt: {CreatedAt:yyyy-MM-dd HH:mm:ss}
+        // UpdatedAt: {UpdatedAt:yyyy-MM-dd HH:mm:ss}
+        // DeviceCount: {DeviceCount}
+        // ";
+        //         }
     }
 }

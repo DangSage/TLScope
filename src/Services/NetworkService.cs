@@ -27,6 +27,7 @@ namespace TLScope.src.Services {
                     while (true) {
                         if (activeDevices.Count < 16) {
                             Parallel.ForEach(ipRange, parallelOptions, ip => {
+                                if (ip == LocalIPAddress) return;
                                 if (IsDeviceActive(ip)) {
                                     activeDevices.AddOrUpdate(ip, true, (key, oldValue) => true);
                                     Logging.Write($"{ip} added to activeDevices list. Total: {activeDevices.Count}");
@@ -58,7 +59,7 @@ namespace TLScope.src.Services {
                 await Task.WhenAll(scanningTask, pingingTask);
             } catch (Exception ex) {
                 throw new Exception($"Error discovering local network: {ex.Message}");
-            }        
+            }
         }
 
         private static string GetLocalIPAddress() {

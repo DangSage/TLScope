@@ -22,12 +22,6 @@ namespace TLScope.src.Models
         public string MACAddress { get; set; } = string.Empty;
 
         [StringLength(100)]
-        public string? Manufacturer { get; set; }
-
-        [StringLength(100)]
-        public string? Model { get; set; }
-
-        [StringLength(100)]
         public string? OperatingSystem { get; set; }
 
         public DateTime LastSeen { get; set; } = DateTime.UtcNow;
@@ -40,24 +34,6 @@ namespace TLScope.src.Models
 
         // Navigation properties
         public virtual ICollection<NetworkInterface> NetworkInterfaces { get; set; } = new List<NetworkInterface>();
-
-        //* Temporary addition for testing
-        //         public override string ToString()
-        //         {
-        //             return $@"
-        // Id: {Id}
-        // DeviceName: {DeviceName}
-        // IPAddress: {IPAddress}
-        // MACAddress: {MACAddress}
-        // Manufacturer: {Manufacturer}
-        // Model: {Model}
-        // OperatingSystem: {OperatingSystem}
-        // LastSeen: {LastSeen:yyyy-MM-dd HH:mm:ss}
-        // UserId: {UserId}
-        // NetworkInterfaces: {NetworkInterfaces.Count}
-        // User: {User?.Username}
-        // ";
-        //         }
     }
 
     public class NetworkInterface

@@ -1,7 +1,8 @@
-﻿using TLScope.src.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using TLScope.src.Data;
 using TLScope.src.Services;
 using Terminal.Gui;
-using TLScope.src.Debugging;
 
 namespace TLScope
 {
@@ -9,73 +10,77 @@ namespace TLScope
     {
         static async Task Main(string[] args)
         {
-            await MainAsync(args);
-        }
+            var serviceCollection = new ServiceCollection();
+            ConfigureServices(serviceCollection);
 
-        static async Task MainAsync(string[] args)
-        {
-            try
+            var serviceProvider = serviceCollection.BuildServiceProvider();
+
+            var networkService = serviceProvider.GetRequiredService<NetworkService>();
+            var tlsService = serviceProvider.GetRequiredService<TlsService>();
+
+            await tlsService.MonitorNetworkAsync();
+
+            // GUI & Visualization
+            Application.Init();
+            var top = Application.Top;
+
+            var win = new Window("TLScope - CTRL-C to quit")
             {
-                NetworkService networkService = new();
+                X = 0,
+                Y = 1, // Leave one row for the menu
+                Width = Dim.Fill(),
+                Height = Dim.Fill()
+            };
 
-                // ## GUI & Visualization. This is temporary
+            var networkInfoLabel = new Label("Hosting TLScope on the local network...")
+            {
+                X = 1,
+                Y = 1,
+                Width = Dim.Fill(),
+                Height = 1
+            };
+            win.Add(networkInfoLabel);
 
-                Application.Init();
+            top.Add(win);
 
-                var colorS = new ColorScheme {
-                    Normal = Terminal.Gui.Attribute.Make(Color.White, Color.Black),
-                    Focus = Terminal.Gui.Attribute.Make(Color.Black, Color.White),
-                    HotNormal = Terminal.Gui.Attribute.Make(Color.White, Color.Black),
-                    HotFocus = Terminal.Gui.Attribute.Make(Color.Black, Color.White),
-                };
-
-                var win = new Window("TLScope - CTRL-C to quit")
+            top.Add(new MenuBar(new MenuBarItem[]
+            {
+                new MenuBarItem("_File", new MenuItem[]
                 {
-                    X = 2,
-                    Y = 2,
-                    Width = Dim.Fill(2),
-                    Height = Dim.Fill(2),
-                    ColorScheme = colorS
-                };
+                    new MenuItem("_Quit", "", () => Application.RequestStop(), null, null, Key.CtrlMask | Key.C)
+                })
+            }));
 
-                // Create a Label to display network information
-                var networkInfoLabel = new Label("Hosting TLScope on the local network...")
+            _ = Task.Run(async () =>
+            {
+                try
                 {
-                    X = 1,
-                    Y = 1,
-                    Width = Dim.Fill(),
-                    Height = 1
-                };
-                win.Add(networkInfoLabel);
-
-                Application.Top.Add(win);
-
-                // Add a key binding for Ctrl+C to exit the application
-                Application.Top.Add(new MenuBar([
-                    new("_File", new MenuItem[] {
-                        new("_Quit", "", () => Application.RequestStop(), null, null, Key.CtrlMask | Key.C)
-                    })
-                ]));
-
-                // Start network discovery in a background task
-                _ = Task.Run(async () => {
-                    await networkService.DiscoverLocalNetworkAsync();
-                    Application.MainLoop.Invoke(() => {
+                    await tlsService.MonitorNetworkAsync();
+                    Application.MainLoop.Invoke(() =>
+                    {
                         networkInfoLabel.Text = $"Hosting From {networkService.LocalIPAddress}\nNetwork devices discovered.";
                     });
-                });
+                }
+                catch (Exception ex)
+                {
+                    Application.MainLoop.Invoke(() =>
+                    {
+                        networkInfoLabel.Text = $"Error: {ex.Message}";
+                    });
+                }
+            });
 
-                Application.Run();
-                Application.Shutdown();
-                // if (true) throw new Exception("This is a test exception.");
-            }
-            catch (Exception ex)
-            {
-                Logging.Error($"{ex.Message}", ex, true);
-            }
-            await Task.Delay(10);
+            Application.Run();
+            Application.Shutdown();
+        }
 
-            Logging.Write("Closing TLScope.");
+        private static void ConfigureServices(IServiceCollection services)
+        {
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlite("Data Source=tlscope.db"));
+
+            services.AddTransient<NetworkService>();
+            services.AddTransient<TlsService>();
         }
     }
 }

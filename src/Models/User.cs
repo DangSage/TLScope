@@ -14,8 +14,10 @@ namespace TLScope.src.Models
         public string Username { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(50)]
-        public string Password { get; set; } = string.Empty;
+        public byte[] PasswordHash { get; set; } = Array.Empty<byte>();
+
+        [Required]
+        public byte[] PasswordSalt { get; set; } = Array.Empty<byte>();
 
         [Required]
         [StringLength(50)]

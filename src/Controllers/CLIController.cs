@@ -48,9 +48,11 @@ namespace TLScope.src.Controllers {
             }
 
         private void CreateAccount() {
+            Console.ForegroundColor = ConsoleColor.Yellow;
             Console.Write("Enter username: ");
             string? username = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(username)) {
+                Console.ResetColor();
                 Console.WriteLine("Username cannot be empty.");
                 return;
                 }
@@ -58,6 +60,7 @@ namespace TLScope.src.Controllers {
             Console.Write("Enter password: ");
             string? password = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(password)) {
+                Console.ResetColor();
                 Console.WriteLine("Password cannot be empty.");
                 return;
                 }
@@ -73,15 +76,18 @@ namespace TLScope.src.Controllers {
 
             _dbContext.Users.Add(user);
             _dbContext.SaveChanges();
+            Console.ResetColor();
 
             Console.WriteLine("Account created successfully.");
             Logging.Write("Account created successfully. Located in the database @ " + user.Id);
             }
 
         private static bool Login(ApplicationDbContext dbContext) {
+            Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("Enter username: ");
             string? username = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(username)) {
+                Console.ResetColor();
                 Console.WriteLine("Username cannot be empty.");
                 return false;
                 }
@@ -89,22 +95,26 @@ namespace TLScope.src.Controllers {
             Console.Write("Enter password: ");
             string? password = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(password)) {
+                Console.ResetColor();
                 Console.WriteLine("Password cannot be empty.");
                 return false;
                 }
 
             var user = dbContext.Users.SingleOrDefault(u => u.Username == username);
             if (user == null) {
+                Console.ResetColor();
                 Console.WriteLine("User not found.");
                 return false;
                 }
 
             bool isPasswordValid = Crypto.VerifyPasswordHash(password, user.PasswordHash, user.PasswordSalt);
             if (!isPasswordValid) {
-                Console.WriteLine("Invalid password.");
+                Console.ResetColor();
+                Console.WriteLine("Invalid Credentials.");
                 return false;
                 }
 
+            Console.ResetColor();
             Console.WriteLine("Login successful.");
             return true;
             }

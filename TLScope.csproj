@@ -5,6 +5,13 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>TLScope</RootNamespace>
+    <AssemblyName>TLScope</AssemblyName>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0-beta</InformationalVersion>
+    <Product>TLScope</Product>
+    <Authors>Ethan Khai Dang</Authors>
   </PropertyGroup>
 
   <ItemGroup>

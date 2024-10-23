@@ -10,45 +10,41 @@ using TLScope.src.Debugging;
 namespace TLScope.src {
     class Program {
         static void Main(string[] args) {
-
             if (args.Length > 0) {
-                if (args[0] == "--version") {
-                    VersionInfo.TLScopeVersionCheck();
-                    return;
-                }
+                var cliController = new CLIController(args, null);
+                // Environment.Exit(0) should be called in CLIController
             }
 
             var services = new ServiceCollection();
-            ConfigureServices(services);
+            ConfigureServices(services, args);
             var serviceProvider = services.BuildServiceProvider();
-
-            var dbContext = serviceProvider.GetService<ApplicationDbContext>();
-            // if dbContext is null, create a new instance of ApplicationDbContext
-            if (dbContext == null) {
-                var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-                    .UseSqlite("Data Source=tlscope.db")
-                    .Options;
-                dbContext = new ApplicationDbContext(options);
-            }
 
             try {
                 // Run the CLIController first
-                var cliController = new CLIController(dbContext);
+                var cliController = serviceProvider.GetService<CLIController>()
+                    ?? throw new InvalidOperationException("CLIController service is null.");
                 cliController.RunCLI();
 
-                // MainApplication(networkService, tlsService);
+                // Proceed with the rest of the application logic
+                var networkService = serviceProvider.GetService<NetworkService>();
+                var tlsService = serviceProvider.GetService<TlsService>();
+
+                // var mainApp = new MainApplication(networkService, tlsService);
+                // mainApp.Run();
             } catch (Exception ex) {
                 Console.WriteLine($"An error occurred: {ex.Message}");
                 Logging.Error("An error occurred in the main application. (NOT Caught)", ex, true);
             }
         }
 
-        private static void ConfigureServices(IServiceCollection services) {
+        private static void ConfigureServices(IServiceCollection services, string[] args) {
+            services.AddSingleton(args); // Register string[] args as a singleton service
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlite("Data Source=tlscope.db"));
 
             services.AddTransient<NetworkService>();
             services.AddTransient<TlsService>();
+            services.AddTransient<CLIController>();
         }
     }
 }

@@ -29,16 +29,16 @@ namespace TLScope.src.Utilities {
                 int initialCursorTop = Console.CursorTop;
 
                 foreach (string line in versioningInfoLines) {
-                    TLScopeMisc.MoveCursorRelative(13, 0);
+                    ConsoleHelper.MoveCursorRelative(13, 0);
                     Console.WriteLine(line);
                     }
 
                 int finalCursorTop = initialCursorTop + versioningInfoLines.Length;
-                TLScopeMisc.MoveCursorRelative(0, -versioningInfoLines.Length);
+                ConsoleHelper.MoveCursorRelative(0, -versioningInfoLines.Length);
                 Console.Write(Constants.IconArt);
-                TLScopeMisc.MoveCursorRelative(0, finalCursorTop - initialCursorTop - Constants.IconArt.Split('\n').Length);
+                ConsoleHelper.MoveCursorRelative(0, finalCursorTop - initialCursorTop - Constants.IconArt.Split('\n').Length);
                 Console.WriteLine();
-                TLScopeMisc.MoveCursorRelative(0, -1);
+                ConsoleHelper.MoveCursorRelative(0, -1);
                 } catch (Exception ex) {
                 Console.WriteLine("An error occurred while checking the version of TLScope.");
                 Console.WriteLine(ex.Message);
@@ -83,7 +83,34 @@ namespace TLScope.src.Utilities {
             }
         }
 
-    public static class TLScopeMisc {
+    /// <summary>
+    /// Provides helper methods for the console for TLScopes uses.
+    /// </summary>
+    public static class ConsoleHelper {
+        public static string ReadMaskedInput() {
+            var passwordBuilder = new StringBuilder();
+            ConsoleKeyInfo keyInfo;
+
+            while (true) {
+                keyInfo = Console.ReadKey(intercept: true);
+
+                if (keyInfo.Key == ConsoleKey.Enter) {
+                    Console.WriteLine();
+                    break;
+                    } else if (keyInfo.Key == ConsoleKey.Backspace) {
+                    if (passwordBuilder.Length > 0) {
+                        passwordBuilder.Length--;
+                        Console.Write("\b \b");
+                        }
+                    } else if (!char.IsControl(keyInfo.KeyChar)) {
+                    passwordBuilder.Append(keyInfo.KeyChar);
+                    Console.Write("*");
+                    }
+                }
+
+            return passwordBuilder.ToString();
+            }
+
         public static void MoveCursorRelative(int columns, int rows) {
             int newLeft = Console.CursorLeft + columns;
             int newTop = Console.CursorTop + rows;

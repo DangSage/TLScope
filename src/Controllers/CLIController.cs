@@ -58,7 +58,7 @@ namespace TLScope.src.Controllers {
                 }
 
             Console.Write("Enter password: ");
-            string? password = Console.ReadLine();
+            string? password = ConsoleHelper.ReadMaskedInput();
             if (string.IsNullOrWhiteSpace(password)) {
                 Console.ResetColor();
                 Console.WriteLine("Password cannot be empty.");
@@ -93,7 +93,7 @@ namespace TLScope.src.Controllers {
                 }
 
             Console.Write("Enter password: ");
-            string? password = Console.ReadLine();
+            string? password = ConsoleHelper.ReadMaskedInput();
             if (string.IsNullOrWhiteSpace(password)) {
                 Console.ResetColor();
                 Console.WriteLine("Password cannot be empty.");

@@ -84,6 +84,7 @@ namespace TLScope.src.Controllers {
         private void CreateAccount() {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.Write("Enter username: ");
+            Console.ResetColor();
             string? username = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(username)) {
                 Console.ResetColor();
@@ -91,7 +92,9 @@ namespace TLScope.src.Controllers {
                 return;
             }
 
+            Console.ForegroundColor = ConsoleColor.Yellow;
             Console.Write("Enter password: ");
+            Console.ResetColor();
             string? password = ConsoleHelper.ReadMaskedInput();
             if (string.IsNullOrWhiteSpace(password)) {
                 Console.ResetColor();

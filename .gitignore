@@ -22,3 +22,15 @@ bld/
 
 # Misc
 *.log
+
+# SQL Server files/objects
+*.mdf
+*.ldf
+*.ndf
+
+*.db
+*.dbmdl
+*.dbproj.schemaview
+*.dbproj.user
+*db-shm
+*db-wal

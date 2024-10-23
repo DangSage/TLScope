@@ -1,0 +1,41 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.cs]
+dotnet_sort_system_directives_first = true
+indent_style = space
+indent_size = 4
+charset = utf-8
+trim_trailing_whitespace = true
+
+# C# specific settings
+[*.cs]
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = true
+csharp_new_line_before_open_brace = none
+csharp_new_line_before_catch = false
+csharp_new_line_before_else = false
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_indent_labels = one_less
+csharp_indent_block_contents = true
+csharp_indent_braces = true
+csharp_indent_namespace_contents = true
+csharp_indent_class_contents = true
+csharp_indent_method_contents = true
+csharp_indent_property_contents = true
+csharp_indent_event_contents = true
+csharp_indent_enum_contents = true
+csharp_indent_interface_contents = true
+csharp_indent_accessors = true

@@ -1,25 +1,26 @@
 using Microsoft.EntityFrameworkCore;
 using TLScope.src.Models;
+using TLScope.src.Debugging;
 
-namespace TLScope.src.Data
-{
+namespace TLScope.src.Data {
     /// <summary>
     /// Represents the database context for the application.
     /// </summary>
     /// <remarks>
     /// The database context is used to interact with the database and represents a session with the database.
-    public class ApplicationDbContext : DbContext
-    {
+    public class ApplicationDbContext : DbContext {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-            : base(options)
-        {
-        }
+            : base(options) {
+            // log the information to the console
+            if (Database.EnsureCreated()) {
+                Logging.Write("Database instance created.");
+                }
+            }
 
         public DbSet<User> Users { get; set; }
         public DbSet<Device> Devices { get; set; }
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
+        protected override void OnModelCreating(ModelBuilder modelBuilder) {
             base.OnModelCreating(modelBuilder);
 
             // Configure entity relationships and constraints
@@ -27,6 +28,6 @@ namespace TLScope.src.Data
                 .HasMany(u => u.Devices)
                 .WithOne(d => d.User)
                 .HasForeignKey(d => d.UserId);
+            }
         }
     }
-}

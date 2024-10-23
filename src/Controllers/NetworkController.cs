@@ -7,10 +7,10 @@
 // NetworkController needs to be able to control, resume, stop, and restart the network monitoring process.
 // NetworkController should be able to handle exceptions and log them.
 
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+
 using TLScope.src.Services;
 
 namespace TLScope.src.Controllers {
@@ -19,26 +19,26 @@ namespace TLScope.src.Controllers {
 
         public NetworkController(NetworkService networkService) {
             _networkService = networkService ?? throw new ArgumentNullException(nameof(networkService));
-        }
+            }
 
         public async Task<IEnumerable<string>> DiscoverLocalNetworkAsync() {
             try {
                 await _networkService.DiscoverLocalNetworkAsync();
                 return _networkService.activeDevices.Keys;
-            } catch (Exception ex) {
+                } catch (Exception ex) {
                 throw new Exception($"Error discovering local network: {ex.Message}");
+                }
             }
-        }
 
         public async Task MonitorNetworkAsync() {
             try {
                 var devices = await DiscoverLocalNetworkAsync();
                 foreach (var device in devices) {
                     Console.WriteLine(device);
-                }
-            } catch (Exception ex) {
+                    }
+                } catch (Exception ex) {
                 Console.WriteLine($"Error monitoring network: {ex.Message}");
+                }
             }
         }
     }
-}

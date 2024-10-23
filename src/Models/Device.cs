@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace TLScope.src.Models
-{
-    public class Device
-    {
+namespace TLScope.src.Models {
+    public class Device {
         [Key]
         public int Id { get; set; }
 
@@ -36,8 +34,7 @@ namespace TLScope.src.Models
         public virtual ICollection<NetworkInterface> NetworkInterfaces { get; set; } = new List<NetworkInterface>();
     }
 
-    public class NetworkInterface
-    {
+    public class NetworkInterface {
         [Key]
         public int Id { get; set; }
 

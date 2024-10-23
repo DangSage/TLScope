@@ -8,5 +8,5 @@ namespace TLScope.src.Utilities {
         // Add more constants as needed
 
         public const string RepositoryUrl = "https://github.com/DangSage/TLScope";
-        }
     }
+}

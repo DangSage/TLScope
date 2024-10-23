@@ -14,8 +14,8 @@ namespace TLScope.src.Data {
             // log the information to the console
             if (Database.EnsureCreated()) {
                 Logging.Write("Database instance created.");
-                }
             }
+        }
 
         public DbSet<User> Users { get; set; }
         public DbSet<Device> Devices { get; set; }
@@ -28,6 +28,6 @@ namespace TLScope.src.Data {
                 .HasMany(u => u.Devices)
                 .WithOne(d => d.User)
                 .HasForeignKey(d => d.UserId);
-            }
         }
     }
+}

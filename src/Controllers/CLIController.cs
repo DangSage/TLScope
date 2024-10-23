@@ -19,8 +19,8 @@ namespace TLScope.src.Controllers {
             // List all of the data in the database for debugging purposes
             foreach (var user in _dbContext.Users) {
                 Logging.Write($"User: {user.Username}");
-                }
             }
+        }
 
         /// <summary>
         /// Runs the command-line interface (CLI) for the application.
@@ -35,17 +35,17 @@ namespace TLScope.src.Controllers {
                     Console.WriteLine("No users found. Please create an account.");
                     CreateAccount();
                     Console.WriteLine("Please restart the application.");
-                    } else {
+                } else {
                     Console.WriteLine("Welcome back! Please log in.\n");
                     bool loginSuccessful = Login(_dbContext);
                     if (!loginSuccessful) {
                         return;
-                        }
                     }
-                } catch (Exception ex) {
-                Console.WriteLine($"An error occurred: {ex.Message}");
                 }
+            } catch (Exception ex) {
+                Console.WriteLine($"An error occurred: {ex.Message}");
             }
+        }
 
         private void CreateAccount() {
             Console.ForegroundColor = ConsoleColor.Yellow;
@@ -55,7 +55,7 @@ namespace TLScope.src.Controllers {
                 Console.ResetColor();
                 Console.WriteLine("Username cannot be empty.");
                 return;
-                }
+            }
 
             Console.Write("Enter password: ");
             string? password = ConsoleHelper.ReadMaskedInput();
@@ -63,7 +63,7 @@ namespace TLScope.src.Controllers {
                 Console.ResetColor();
                 Console.WriteLine("Password cannot be empty.");
                 return;
-                }
+            }
 
             byte[] passwordHash, passwordSalt;
             Crypto.CreatePasswordHash(password, out passwordHash, out passwordSalt);
@@ -72,7 +72,7 @@ namespace TLScope.src.Controllers {
                 Username = username,
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt
-                };
+            };
 
             _dbContext.Users.Add(user);
             _dbContext.SaveChanges();
@@ -80,7 +80,7 @@ namespace TLScope.src.Controllers {
 
             Console.WriteLine("Account created successfully.");
             Logging.Write("Account created successfully. Located in the database @ " + user.Id);
-            }
+        }
 
         private static bool Login(ApplicationDbContext dbContext) {
             Console.ForegroundColor = ConsoleColor.Green;
@@ -90,7 +90,7 @@ namespace TLScope.src.Controllers {
                 Console.ResetColor();
                 Console.WriteLine("Username cannot be empty.");
                 return false;
-                }
+            }
 
             Console.Write("Enter password: ");
             string? password = ConsoleHelper.ReadMaskedInput();
@@ -98,25 +98,25 @@ namespace TLScope.src.Controllers {
                 Console.ResetColor();
                 Console.WriteLine("Password cannot be empty.");
                 return false;
-                }
+            }
 
             var user = dbContext.Users.SingleOrDefault(u => u.Username == username);
             if (user == null) {
                 Console.ResetColor();
                 Console.WriteLine("User not found.");
                 return false;
-                }
+            }
 
             bool isPasswordValid = Crypto.VerifyPasswordHash(password, user.PasswordHash, user.PasswordSalt);
             if (!isPasswordValid) {
                 Console.ResetColor();
                 Console.WriteLine("Invalid Credentials.");
                 return false;
-                }
+            }
 
             Console.ResetColor();
             Console.WriteLine("Login successful.");
             return true;
-            }
         }
     }
+}

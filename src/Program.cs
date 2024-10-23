@@ -7,7 +7,7 @@ using TLScope.src.Controllers;
 using System;
 using TLScope.src.Debugging;
 
-namespace TLScope {
+namespace TLScope.src {
     class Program {
         static void Main(string[] args) {
 
@@ -15,8 +15,8 @@ namespace TLScope {
                 if (args[0] == "--version") {
                     VersionInfo.TLScopeVersionCheck();
                     return;
-                    }
                 }
+            }
 
             var services = new ServiceCollection();
             ConfigureServices(services);
@@ -29,7 +29,7 @@ namespace TLScope {
                     .UseSqlite("Data Source=tlscope.db")
                     .Options;
                 dbContext = new ApplicationDbContext(options);
-                }
+            }
 
             try {
                 // Run the CLIController first
@@ -37,11 +37,11 @@ namespace TLScope {
                 cliController.RunCLI();
 
                 // MainApplication(networkService, tlsService);
-                } catch (Exception ex) {
+            } catch (Exception ex) {
                 Console.WriteLine($"An error occurred: {ex.Message}");
                 Logging.Error("An error occurred in the main application. (NOT Caught)", ex, true);
-                }
             }
+        }
 
         private static void ConfigureServices(IServiceCollection services) {
             services.AddDbContext<ApplicationDbContext>(options =>
@@ -49,6 +49,6 @@ namespace TLScope {
 
             services.AddTransient<NetworkService>();
             services.AddTransient<TlsService>();
-            }
         }
     }
+}

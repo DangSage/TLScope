@@ -18,16 +18,16 @@ namespace TLScope.src {
             _networkService = networkService ?? throw new ArgumentNullException(nameof(networkService));
             _tlsService = tlsService ?? throw new ArgumentNullException(nameof(tlsService));
             Logging.Write("MainApplication initialized.");
-            }
+        }
 
         public void Run() {
             try {
                 // Main application logic goes here
                 // For example, you can call methods from _networkService and _tlsService
                 // to perform network operations and TLS handshakes
-                } catch (Exception ex) {
+            } catch (Exception ex) {
                 Logging.Error("An error occurred in the main application.", ex);
-                }
             }
         }
     }
+}

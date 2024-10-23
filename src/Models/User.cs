@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace TLScope.src.Models
-{
-    public class User
-    {
+namespace TLScope.src.Models {
+    public class User {
         [Key]
         public int Id { get; set; }
 

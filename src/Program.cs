@@ -10,9 +10,12 @@ using TLScope.src.Debugging;
 namespace TLScope.src {
     class Program {
         static void Main(string[] args) {
+            Utilities.Environment.SetEnvironmentVariables();
+
             if (args.Length > 0) {
                 var cliController = new CLIController(args, null);
-                // Environment.Exit(0) should be called in CLIController
+                cliController.RunCLI();
+                return;
             }
 
             var services = new ServiceCollection();
@@ -20,12 +23,11 @@ namespace TLScope.src {
             var serviceProvider = services.BuildServiceProvider();
 
             try {
-                // Run the CLIController first
                 var cliController = serviceProvider.GetService<CLIController>()
                     ?? throw new InvalidOperationException("CLIController service is null.");
                 cliController.RunCLI();
 
-                // Proceed with the rest of the application logic
+                // Login is successful, start the main application
                 var networkService = serviceProvider.GetService<NetworkService>();
                 var tlsService = serviceProvider.GetService<TlsService>();
 

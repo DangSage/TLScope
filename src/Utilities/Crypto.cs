@@ -26,7 +26,7 @@ namespace TLScope.src.Utilities {
                 passwordHash = argon2.GetBytes(32); // Generate a 32-byte hash
             } // argon2.Dispose() is called automatically here
 
-            Logging.Write("Generated hash: " + BitConverter.ToString(passwordHash));
+            Logging.Write($"Password hash: {BitConverter.ToString(passwordHash)}");
         }
 
         /// <summary>
@@ -44,9 +44,6 @@ namespace TLScope.src.Utilities {
             } // argon2.Dispose() is called automatically here
 
             Logging.Write("Computed hash: " + BitConverter.ToString(computedHash));
-
-            // random delay to prevent timing attacks
-            RandomNumberGenerator.Fill(computedHash);
 
             // Compare the computed hash with the stored hash using constant-time comparison
             return CryptographicOperations.FixedTimeEquals(computedHash, storedHash);

@@ -74,7 +74,9 @@ namespace TLScope.src.Utilities {
             var assemblies = Assembly.GetExecutingAssembly().GetReferencedAssemblies();
             var packagesBuilder = new StringBuilder();
             foreach (var assembly in assemblies) {
-                if (assembly.Name != null && (assembly.Name.StartsWith("System.") || assembly.Name.StartsWith("System"))) {
+                if (assembly.Name != null && (assembly.Name.StartsWith("System.")
+                            || assembly.Name.StartsWith("System")
+                            || assembly.Name.Contains("Dependency"))) {
                     continue;
                 }
                 packagesBuilder.AppendLine($"Using {assembly.Name} version {assembly.Version}");

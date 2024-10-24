@@ -2,7 +2,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using TLScope.src.Data;
 using TLScope.src.Services;
-using TLScope.src.Utilities;
 using TLScope.src.Controllers;
 using System;
 using TLScope.src.Debugging;
@@ -13,9 +12,15 @@ namespace TLScope.src {
             Utilities.Environment.SetEnvironmentVariables();
 
             if (args.Length > 0) {
-                var cliController = new CLIController(args, null);
+                // Some arguments are given, CLIController should be run first
+                // This will handle the arguments and exit the application
+                var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+                    .UseSqlite("Data Source=tlscope.db")
+                    .Options;
+                using var dbContext = new ApplicationDbContext(options);
+                var cliController = new CLIController(args, dbContext);
                 cliController.RunCLI();
-                return;
+                Environment.Exit(0); // Exit after CLI execution
             }
 
             var services = new ServiceCollection();
@@ -28,11 +33,13 @@ namespace TLScope.src {
                 cliController.RunCLI();
 
                 // Login is successful, start the main application
-                var networkService = serviceProvider.GetService<NetworkService>();
-                var tlsService = serviceProvider.GetService<TlsService>();
+                var networkController = serviceProvider.GetService<NetworkController>();
 
-                // var mainApp = new MainApplication(networkService, tlsService);
-                // mainApp.Run();
+                if (networkController == null) {
+                    throw new InvalidOperationException("NetworkController service is null.");
+                }
+                var mainApp = new MainApplication(networkController);
+                mainApp.Run();
             } catch (Exception ex) {
                 Console.WriteLine($"An error occurred: {ex.Message}");
                 Logging.Error("An error occurred in the main application. (NOT Caught)", ex, true);
@@ -45,7 +52,7 @@ namespace TLScope.src {
                 options.UseSqlite("Data Source=tlscope.db"));
 
             services.AddTransient<NetworkService>();
-            services.AddTransient<TlsService>();
+            services.AddTransient<NetworkController>();
             services.AddTransient<CLIController>();
         }
     }

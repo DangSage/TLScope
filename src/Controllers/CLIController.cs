@@ -1,87 +1,74 @@
 using System;
 using System.Linq;
+using System.Diagnostics;
+
 using TLScope.src.Models;
-using TLScope.src.Services;
 using TLScope.src.Utilities;
 using TLScope.src.Data;
-using Microsoft.EntityFrameworkCore;
 using TLScope.src.Debugging;
-using System.Diagnostics;
+
+using Microsoft.EntityFrameworkCore;
+
 
 namespace TLScope.src.Controllers {
     public class CLIController {
         private readonly string[] _args;
-        private readonly ApplicationDbContext _dbContext;
+        private ApplicationDbContext? _dbContext;
 
-        public CLIController(string[]? args, ApplicationDbContext? dbContext) {
+        public CLIController(string[] args, ApplicationDbContext? dbContext) {
             _args = args ?? throw new ArgumentNullException(nameof(args));
+            _dbContext = dbContext;
+        }
 
-            // CLI options for running
+        public void RunCLI() {
             if (_args.Length > 0) {
                 switch (_args[0]) {
                     case "--version":
                         VersionInfo.TLScopeVersionCheck();
-                        Environment.Exit(0);
                         break;
                     case "--help":
-                        VersionInfo.GetVersion();
-                        Console.WriteLine("Usage: dotnet run [options]");
-                        Console.WriteLine("Options:");
-                        Console.WriteLine("  --version    Display version information");
-                        Console.WriteLine("  --help       Display this help message");
-                        Console.WriteLine("  --github     Open the GitHub repository in the default browser");
-                        Environment.Exit(0);
+                        DisplayHelp();
                         break;
                     case "--github":
-                        // Open the GitHub repository in the default browser
-                        Console.WriteLine("Opening the GitHub repository...");
-                        try {
-                            var psi = new ProcessStartInfo {
-                                FileName = Constants.RepositoryUrl,
-                                UseShellExecute = true
-                            };
-                            Process.Start(psi);
-                        } catch (Exception ex) {
-                            Console.WriteLine($"Failed to open the GitHub repository: {ex.Message}");
-                        }
-                        Environment.Exit(0);
+                        OpenGitHubRepository();
+                        break;
+                    case "--register":
+                        CreateAccount();
+                        Console.WriteLine("Restart the application to log in.");
                         break;
                     default:
                         Console.WriteLine("Unknown option: " + _args[0]);
-                        Console.WriteLine("Use --help for more information.");
-                        Environment.Exit(0);
                         break;
                 }
+            } else {
+                RunInteractiveMode();
             }
-
-            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
-        /// <summary>
-        /// Runs the command-line interface (CLI) for the application.
-        /// * Entry point for the application.
-        /// </summary>
-        public void RunCLI() {
+        private void DisplayHelp() {
+            Console.WriteLine("Usage: dotnet run [options]");
+            Console.WriteLine("Options:");
+            Console.WriteLine("  --version    Display version information");
+            Console.WriteLine("  --help       Display this help message");
+            Console.WriteLine("  --github     Open the GitHub repository");
+            Console.WriteLine("  --register   Register a new user");
+        }
+
+        private void OpenGitHubRepository() {
+            Console.WriteLine("Opening the GitHub repository...");
             try {
-                VersionInfo.TLScopeVersionCheck();
-                bool userExists = _dbContext.Users.Any();
-                if (!userExists) {
-                    Console.WriteLine("No users found. Please create an account.");
-                    CreateAccount();
-                    Console.WriteLine("Please restart the application.");
-                } else {
-                    Console.WriteLine("Welcome back! Please log in.\n");
-                    bool loginSuccessful = Login();
-                    if (!loginSuccessful) {
-                        return;
-                    }
-                }
+                var psi = new ProcessStartInfo {
+                    FileName = Constants.RepositoryUrl,
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
             } catch (Exception ex) {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                Console.WriteLine($"Failed to open the GitHub repository: {ex.Message}");
             }
         }
 
         private void CreateAccount() {
+            Console.WriteLine("Registering a new user...");
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.Write("Enter username: ");
             Console.ResetColor();
@@ -111,6 +98,9 @@ namespace TLScope.src.Controllers {
                 PasswordSalt = passwordSalt
             };
 
+            _dbContext ??= new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseSqlite("Data Source=tlscope.db")
+                .Options);
             _dbContext.Users.Add(user);
             _dbContext.SaveChanges();
             Console.ResetColor();
@@ -120,6 +110,11 @@ namespace TLScope.src.Controllers {
         }
 
         private bool Login() {
+            if (_dbContext == null) {
+                Console.WriteLine("Database context is not initialized.");
+                return false;
+            }
+
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Write("Enter username: ");
             Console.ResetColor();
@@ -157,6 +152,35 @@ namespace TLScope.src.Controllers {
             Console.ResetColor();
             Console.WriteLine("Login successful.");
             return true;
+        }
+
+        private void RunInteractiveMode() {
+            Console.WriteLine("This not what you expected? Use --help for options.");
+            // Initialize the dbContext if it is null
+            if (_dbContext == null) {
+                var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+                    .UseSqlite("Data Source=tlscope.db")
+                    .Options;
+                _dbContext = new ApplicationDbContext(options);
+            }
+
+            try {
+                VersionInfo.TLScopeVersionCheck();
+                bool userExists = _dbContext.Users.AsNoTracking().Any(); // Use no-tracking query
+                if (!userExists) {
+                    Console.WriteLine("No users found. Please create an account.");
+                    CreateAccount();
+                    Console.WriteLine("Please restart the application.");
+                } else {
+                    Console.WriteLine("Welcome back! Please log in.");
+                    bool loginSuccessful = Login();
+                    if (!loginSuccessful) {
+                        return;
+                    }
+                }
+            } catch (Exception ex) {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+            }
         }
     }
 }

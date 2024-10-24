@@ -63,7 +63,7 @@ namespace TLScope.src.Controllers {
                 };
                 Process.Start(psi);
             } catch (Exception ex) {
-                Console.WriteLine($"Failed to open the GitHub repository: {ex.Message}");
+                Logging.Error($"Failed to open the GitHub repository", ex);
             }
         }
 

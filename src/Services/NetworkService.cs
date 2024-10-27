@@ -1,81 +1,80 @@
 using System.Collections.Concurrent;
-
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-
+using System.Threading;
+using System.Threading.Tasks;
 using TLScope.src.Debugging;
+using TLScope.src.Models;
 
 namespace TLScope.src.Services {
     public class NetworkService {
-        public ConcurrentDictionary<string, bool> activeDevices = new();
+        private const int MaxParallelism = 3; // Limit the number of parallel tasks
 
-        public string? LocalIPAddress { get; private set; }
+        public async Task ScanNetworkAsync(string localIPAddress, ConcurrentDictionary<string, Device> activeDevices, CancellationToken cancellationToken) {
+            var subnetMask = GetSubnetMask(localIPAddress);
+            var ipRange = GetIPRange(localIPAddress, subnetMask);
 
-        public async Task DiscoverLocalNetworkAsync() {
-            try {
-                LocalIPAddress = GetLocalIPAddress();
-                var subnetMask = GetSubnetMask(LocalIPAddress);
-                var ipRange = GetIPRange(LocalIPAddress, subnetMask);
+            var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = MaxParallelism, CancellationToken = cancellationToken };
 
-                var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 3 };
-
-                // ARP Scanning with Parallel Processing
-                var scanningTask = Task.Run(() => {
-                    while (true) {
-                        if (activeDevices.Count < 16) {
-                            Parallel.ForEach(ipRange, parallelOptions, ip => {
-                                if (ip == LocalIPAddress) return;
-                                if (IsDeviceActive(ip)) {
-                                    activeDevices.AddOrUpdate(ip, true, (key, oldValue) => true);
-                                    Logging.Write($"{ip} added to activeDevices list. Total: {activeDevices.Count}");
-                                }
-                                Task.Delay(100).Wait(); // Throttle speed by adding a delay
-                            });
-                        }
-                        Task.Delay(5000).Wait(); // Delay for 5 seconds before next scan
-                    }
-                });
-
-                // ICMP Pinging for verification with Parallel Processing
-                var pingingTask = Task.Run(() => {
-                    while (true) {
-                        Parallel.ForEach(activeDevices.Keys, parallelOptions, ip => {
-                            using (var ping = new Ping()) {
-                                PingReply reply = ping.Send(ip, 3000);
-
-                                if (reply.Status != IPStatus.Success) {
-                                    activeDevices.TryRemove(ip, out _);
-                                    Logging.Write($"{ip} {reply.Status}. Removed from activeDevices list.");
+            // ARP Scanning with Parallel Processing
+            await Task.Run(async () => {
+                while (!cancellationToken.IsCancellationRequested) {
+                    if (activeDevices.Count < 16) {
+                        Parallel.ForEach(ipRange, parallelOptions, ip => {
+                            if (ip == localIPAddress) return;
+                            if (IsDeviceActive(ip)) {
+                                Device _device = new Device {
+                                    DeviceName = ip,
+                                    IPAddress = ip
+                                };
+                                if (activeDevices.AddOrUpdate(ip, _device, (key, value) => value) == _device) {
+                                    Logging.Write($"{ip} is active. Added to activeDevices list.");
                                 }
                             }
-                            Task.Delay(100).Wait(); // Throttle speed by adding a delay
                         });
                     }
-                });
-
-                await Task.WhenAll(scanningTask, pingingTask);
-            } catch (Exception ex) {
-                throw new Exception($"Error discovering local network: {ex.Message}");
-            }
-        }
-
-        private static string GetLocalIPAddress() {
-            foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces()) {
-                if (networkInterface.OperationalStatus == OperationalStatus.Up &&
-                    (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
-                     networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)) {
-                    foreach (var unicastAddress in networkInterface.GetIPProperties().UnicastAddresses) {
-                        if (unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork) {
-                            // This should only be called once. If the interface cuts off or changes
-                            // the IP address, the program should be cut off and restarted.
-                            Logging.Write($"Hosting from Local IP Address: {unicastAddress.Address}");
-                            return unicastAddress.Address.ToString();
-                        }
+                    try {
+                        await Task.Delay(5000, cancellationToken); // Delay for 5 seconds before next scan
+                    } catch (TaskCanceledException) {
+                        break;
                     }
                 }
-            }
-            throw new Exception($"Local IP Address Not Found!\nAre you connected to WiFi?");
+                Logging.Write("Network scanning stopped.");
+            }, cancellationToken);
+        }
+
+        public async Task PingDevicesAsync(ConcurrentDictionary<string, Device> activeDevices, CancellationToken cancellationToken) {
+            var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = MaxParallelism, CancellationToken = cancellationToken };
+
+            // ICMP Pinging for verification with Parallel Processing
+            await Task.Run(async () => {
+                while (!cancellationToken.IsCancellationRequested) {
+                    Parallel.ForEach(activeDevices.Keys, parallelOptions, async ip => {
+                        using (var ping = new Ping()) {
+                            try {
+                                PingReply reply = await ping.SendPingAsync(ip, 3000);
+
+                                if (reply.Status != IPStatus.Success) {
+                                    if (activeDevices.TryRemove(ip, out _)) {
+                                        Logging.Write($"TIMEOUT: {ip} is inactive. Removed from activeDevices list.");
+                                    }
+                                }
+                            } catch (PingException ex) {
+                                Logging.Write($"Ping failed for {ip}: {ex.Message}");
+                            } catch (Exception ex) {
+                                Logging.Write($"Error checking device status for {ip}: {ex.Message}");
+                            }
+                        }
+                    });
+                    try {
+                        await Task.Delay(100, cancellationToken); // Throttle speed by adding a delay
+                    } catch (TaskCanceledException) {
+                        break;
+                    }
+                }
+                Logging.Write("Device pinging stopped.");
+            }, cancellationToken);
         }
 
         private static string GetSubnetMask(string ipAddress) {

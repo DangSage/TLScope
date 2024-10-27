@@ -31,10 +31,10 @@ namespace TLScope.src.Models {
         public virtual User? User { get; set; }
 
         // Navigation properties
-        public virtual ICollection<NetworkInterface> NetworkInterfaces { get; set; } = new List<NetworkInterface>();
+        public virtual ICollection<ENetworkInterface> ENetworkInterfaces { get; set; } = new List<ENetworkInterface>();
     }
 
-    public class NetworkInterface {
+    public class ENetworkInterface {
         [Key]
         public int Id { get; set; }
 

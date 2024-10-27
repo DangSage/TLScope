@@ -1,3 +1,5 @@
+// SQLite database context for the application.
+
 using Microsoft.EntityFrameworkCore;
 using TLScope.src.Models;
 using TLScope.src.Debugging;

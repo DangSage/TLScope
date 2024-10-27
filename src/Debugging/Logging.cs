@@ -1,19 +1,25 @@
-using System;
-using System.IO;
 using System.Runtime.CompilerServices;
 
 namespace TLScope.src.Debugging {
     public static class Logging {
-        private static readonly string logFile = Path.Combine(Environment.CurrentDirectory, "tlscope.log");
+        private static readonly string logDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+        private static readonly string logFile = Path.Combine(logDirectory, "latest.log");
+
+        private static readonly string initTime = $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff}";
 
         static Logging() {
-            // if log file already exists (contains data), append 2 new lines
-            using StreamWriter sw = new(logFile, true);
+            // Ensure the log directory exists
+            Directory.CreateDirectory(logDirectory);
+
+            // If log file already exists (contains data), append 2 new lines
+            using StreamWriter sw = new(logFile, false);
             if (sw.BaseStream.Length > 0) {
                 sw.WriteLine();
                 sw.WriteLine();
             }
-            sw.WriteLine($"======= Logging Session. {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} =======");
+
+            sw.WriteLine($"======= Logging Session. {initTime} =======");
+            AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
         }
 
         public static void Write(string message,
@@ -34,7 +40,7 @@ namespace TLScope.src.Debugging {
             string logMessage = $"[{DateTime.Now:HH:mm:ss.fff}] ERROR was caught @ {fileName}:{lineNumber} ({memberName}) - '{message}'";
             if (ex != null) {
                 logMessage += $"\n\t└> {ex.GetType().Name}: {ex.Message}\n\t└> Stack Trace: {ex.StackTrace}";
-                // full exception details
+                // Full exception details
                 logMessage += ex.InnerException != null ? $"\n\t└> Inner Exception: {ex.InnerException.Message}" : "";
             }
 
@@ -53,6 +59,16 @@ namespace TLScope.src.Debugging {
                 Environment.Exit(1);
             }
             sw.Close();
+        }
+
+        private static void OnProcessExit(object? sender, EventArgs e) {
+            // Perform any necessary cleanup here
+            using StreamWriter sw = new(logFile, true);  // Append mode
+            sw.WriteLine($"======= Logging Session Ended. {DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff} =======");
+
+            // copy the log file to a latest.log file
+            string latestLogFile = Path.Combine(logDirectory, $"{initTime}.log");
+            File.Copy(logFile, latestLogFile, true);
         }
 
         public static void MakeLogFileWritable() {

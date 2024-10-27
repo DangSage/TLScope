@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TLScope.src.Data;
 using TLScope.src.Services;
 using TLScope.src.Controllers;
-using System;
+using TLScope.src.Utilities;
 using TLScope.src.Debugging;
 
 namespace TLScope.src {
@@ -12,15 +12,8 @@ namespace TLScope.src {
             Utilities.Environment.SetEnvironmentVariables();
 
             if (args.Length > 0) {
-                // Some arguments are given, CLIController should be run first
-                // This will handle the arguments and exit the application
-                var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-                    .UseSqlite("Data Source=tlscope.db")
-                    .Options;
-                using var dbContext = new ApplicationDbContext(options);
-                var cliController = new CLIController(args, dbContext);
-                cliController.RunCLI();
-                Environment.Exit(0); // Exit after CLI execution
+                var cliController = new CLIController(args, null);
+                cliController.RunCLI(); // should exit the environment on its own
             }
 
             var services = new ServiceCollection();
@@ -40,9 +33,15 @@ namespace TLScope.src {
                 }
                 var mainApp = new MainApplication(networkController);
                 mainApp.Run();
+                // clean up
+                serviceProvider.Dispose();
+
             } catch (Exception ex) {
                 Console.WriteLine($"An error occurred: {ex.Message}");
                 Logging.Error("An error occurred in the main application. (NOT Caught)", ex, true);
+            } finally {
+                Logging.Write("Exiting TLScope...");
+                Console.WriteLine(Constants.GoodbyeMessage);
             }
         }
 

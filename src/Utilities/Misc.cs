@@ -1,8 +1,8 @@
 // Purpose: Contains utility classes for TLScope that don't fit into the specific scopes of the project.
 
-using System;
 using System.Reflection;
 using System.Text;
+using System.Collections.Concurrent;
 
 namespace TLScope.src.Utilities {
     /// <summary>
@@ -122,6 +122,76 @@ namespace TLScope.src.Utilities {
             newTop = Math.Max(0, Math.Min(newTop, Console.WindowHeight - 1));
 
             Console.SetCursorPosition(newLeft, newTop);
+        }
+
+        public static string DisplayList(string msg1, ConcurrentDictionary<string, object> dataDict, string msg2, string prefix = "", int it = 0) {
+            var resultBuilder = new StringBuilder();
+
+            if (it == 0) {
+                resultBuilder.AppendLine(msg1);
+            }
+
+            if (dataDict.Count == 0) {
+                resultBuilder.AppendLine($"{prefix} └─{msg2}");
+            } else {
+                int i = 0;
+                foreach (var kvp in dataDict) {
+                    string key = kvp.Key;
+                    object value = kvp.Value;
+
+                    if (value is ConcurrentDictionary<string, object> nestedDict) {
+                        if (i == dataDict.Count - 1) { // if last item in dictionary
+                            resultBuilder.AppendLine($"{prefix} └─{key}:");
+                            DisplayListRecursive(resultBuilder, "", nestedDict, "No items.", prefix + "  ", it + 1);
+                        } else {
+                            resultBuilder.AppendLine($"{prefix} ├─{key}:");
+                            DisplayListRecursive(resultBuilder, "", nestedDict, "No items.", prefix + " │", it + 1);
+                        }
+                    } else {
+                        if (i == dataDict.Count - 1) {
+                            resultBuilder.AppendLine($"{prefix} └─{key}: {value}");
+                        } else {
+                            resultBuilder.AppendLine($"{prefix} ├─{key}: {value}");
+                        }
+                    }
+                    i++;
+                }
+            }
+
+            return resultBuilder.ToString();
+        }
+
+        private static void DisplayListRecursive(StringBuilder resultBuilder, string msg1, ConcurrentDictionary<string, object> dataDict, string msg2, string prefix, int it) {
+            if (it == 0) {
+                resultBuilder.AppendLine(msg1);
+            }
+
+            if (dataDict.Count == 0) {
+                resultBuilder.AppendLine($"{prefix} └─{msg2}");
+            } else {
+                int i = 0;
+                foreach (var kvp in dataDict) {
+                    string key = kvp.Key;
+                    object value = kvp.Value;
+
+                    if (value is ConcurrentDictionary<string, object> nestedDict) {
+                        if (i == dataDict.Count - 1) { // if last item in dictionary
+                            resultBuilder.AppendLine($"{prefix} └─{key}:");
+                            DisplayListRecursive(resultBuilder, "", nestedDict, "No items.", prefix + "  ", it + 1);
+                        } else {
+                            resultBuilder.AppendLine($"{prefix} ├─{key}:");
+                            DisplayListRecursive(resultBuilder, "", nestedDict, "No items.", prefix + " │", it + 1);
+                        }
+                    } else {
+                        if (i == dataDict.Count - 1) {
+                            resultBuilder.AppendLine($"{prefix} └─{key}: {value}");
+                        } else {
+                            resultBuilder.AppendLine($"{prefix} ├─{key}: {value}");
+                        }
+                    }
+                    i++;
+                }
+            }
         }
     }
 }

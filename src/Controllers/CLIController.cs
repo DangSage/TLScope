@@ -40,8 +40,11 @@ namespace TLScope.src.Controllers {
                         Console.WriteLine("Unknown option: " + _args[0]);
                         break;
                 }
+                System.Environment.Exit(0);
             } else {
-                RunInteractiveMode();
+                if (!RunInteractiveMode()) {
+                    System.Environment.Exit(1);
+                }
             }
         }
 
@@ -138,7 +141,7 @@ namespace TLScope.src.Controllers {
             var user = _dbContext.Users.SingleOrDefault(u => u.Username == username);
             if (user == null) {
                 Console.ResetColor();
-                Console.WriteLine("User not found.");
+                Console.WriteLine("Invalid Credentials.");
                 return false;
             }
 
@@ -150,11 +153,13 @@ namespace TLScope.src.Controllers {
             }
 
             Console.ResetColor();
-            Console.WriteLine("Login successful.");
+            Console.WriteLine("Login successful. Press any key to continue.");
+            // get any key input
+            Console.ReadKey();
             return true;
         }
 
-        private void RunInteractiveMode() {
+        private bool RunInteractiveMode() {
             Console.WriteLine("This not what you expected? Use --help for options.");
             // Initialize the dbContext if it is null
             if (_dbContext == null) {
@@ -175,12 +180,14 @@ namespace TLScope.src.Controllers {
                     Console.WriteLine("Welcome back! Please log in.");
                     bool loginSuccessful = Login();
                     if (!loginSuccessful) {
-                        return;
+                        return false;
                     }
                 }
             } catch (Exception ex) {
                 Console.WriteLine($"An error occurred: {ex.Message}");
+                return false;
             }
+            return true;
         }
     }
 }

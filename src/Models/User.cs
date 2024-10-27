@@ -24,30 +24,17 @@ namespace TLScope.src.Models {
         [Required]
         [StringLength(50)]
         public string Role { get; set; } = string.Empty;
+        
+        [StringLength(50)]
+        public string Art { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation property
-        public virtual ICollection<Device> Devices { get; set; } = new List<Device>();
+        // Navigation properties (devices, messages, etc.)
+        [Required]
+        public ICollection<Device> Devices { get; set; } = new List<Device>();
 
-        // Device counter
-        public int DeviceCount => Devices.Count;
-
-        // * Temporary addition for testing
-        //         public override string ToString()
-        //         {
-        //             return $@"
-        // Id: {Id}
-        // Username: {Username}
-        // Password: {Password}
-        // Email: {Email}
-        // Role: {Role}
-        // CreatedAt: {CreatedAt:yyyy-MM-dd HH:mm:ss}
-        // UpdatedAt: {UpdatedAt:yyyy-MM-dd HH:mm:ss}
-        // DeviceCount: {DeviceCount}
-        // ";
-        //         }
     }
 }

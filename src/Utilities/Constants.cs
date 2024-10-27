@@ -3,6 +3,8 @@ using System.IO;
 
 using TLScope.src.Debugging;
 
+using Terminal.Gui;
+
 namespace TLScope.src.Utilities {
     public static class Constants {
         public const string IconArt = @"
@@ -11,6 +13,13 @@ namespace TLScope.src.Utilities {
    / | \ ";
         public const string GoodbyeMessage = "Thank you for using TLScope!";
         public const string RepositoryUrl = "https://github.com/DangSage/TLScope";
+
+        public static readonly ColorScheme TLSColorScheme = new() {
+            Normal = new Terminal.Gui.Attribute(Color.White, Color.Black),
+            Focus = new Terminal.Gui.Attribute(Color.White, Color.DarkGray),
+            HotNormal = new Terminal.Gui.Attribute(Color.Black, Color.BrightYellow),
+            HotFocus = new Terminal.Gui.Attribute(Color.Black, Color.White),
+        };
     }
 
     /// <summary>

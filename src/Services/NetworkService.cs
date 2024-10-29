@@ -20,7 +20,7 @@ namespace TLScope.src.Services {
         
             // ARP Scanning with Parallel Processing
             while (!cancellationToken.IsCancellationRequested) {
-                if (activeDevices.Count < 16) {
+                if (activeDevices.Count <= 15) {
                     Parallel.ForEach(ipRange, parallelOptions, ip => {
                         if (ip == localIPAddress) return;
                         if (IsDeviceActive(ip)) {
@@ -30,7 +30,7 @@ namespace TLScope.src.Services {
                             };
 
                             lock (lockObject) {
-                                if (activeDevices.Count < 16) {
+                                if (activeDevices.Count <= 15) {
                                     if (activeDevices.AddOrUpdate(ip, _device, (key, value) => value) == _device) {
                                         Logging.Write($"{ip} is active. Added to activeDevices list. Total: {activeDevices.Count}");
                                     }
@@ -65,7 +65,6 @@ namespace TLScope.src.Services {
                                     Logging.Write($"TIMEOUT: {ip} is inactive. Removed from activeDevices list.");
                                 }
                             }
-                            Logging.Write($"PING: {ip} - {reply.Status}");
                         } catch (PingException ex) {
                             Logging.Write($"Ping failed for {ip}: {ex.Message}");
                         } catch (Exception ex) {

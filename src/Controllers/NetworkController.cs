@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+
 using TLScope.src.Services;
 using TLScope.src.Models;
 using TLScope.src.Debugging;
@@ -15,16 +16,17 @@ namespace TLScope.src.Controllers {
             Logging.Write("NetworkController initialized.");
         }
 
-        public async Task<ConcurrentDictionary<string, Device>> DiscoverLocalNetworkAsync(CancellationToken cancellationToken) {
+        public async Task DiscoverLocalNetworkAsync(CancellationToken cancellationToken) {
             try {
                 var localIPAddress = GetLocalIPAddress();
                 if (localIPAddress == null) {
                     Logging.Error("Local IP Address not found. Network discovery aborted.");
-                    return _activeDevices;
+                    return;
                 }
+                Logging.Write($"Hosting from: {localIPAddress}");
 
-                var scanTask = NetworkService.ScanNetworkAsync(localIPAddress, _activeDevices, cancellationToken);
-                var pingTask = NetworkService.PingDevicesAsync(_activeDevices, cancellationToken);
+                var scanTask = Task.Run(() => NetworkService.ScanNetworkAsync(localIPAddress, _activeDevices, cancellationToken));
+                var pingTask = Task.Run(() => NetworkService.PingDevicesAsync(_activeDevices, cancellationToken));
 
                 await Task.WhenAll(scanTask, pingTask);
                 Logging.Write("Network discovery completed.");
@@ -34,8 +36,6 @@ namespace TLScope.src.Controllers {
             } catch (Exception ex) {
                 Logging.Error("An error occurred during network discovery.", ex);
             }
-
-            return _activeDevices;
         }
 
         private void OnDevicesUpdated() {
@@ -48,13 +48,14 @@ namespace TLScope.src.Controllers {
 
         private static string? GetLocalIPAddress() {
             foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces()) {
-                if (networkInterface.OperationalStatus == OperationalStatus.Up) {
-                    foreach (var unicastAddress in networkInterface.GetIPProperties().UnicastAddresses) {
-                        if (unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork) {
-                            return unicastAddress.Address.ToString();
-                        }
-                    }
+            if (networkInterface.OperationalStatus == OperationalStatus.Up && 
+                (networkInterface.Name == "wlan0" || networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)) {
+                foreach (var unicastAddress in networkInterface.GetIPProperties().UnicastAddresses) {
+                if (unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork) {
+                    return unicastAddress.Address.ToString();
                 }
+                }
+            }
             }
             return null;
         }

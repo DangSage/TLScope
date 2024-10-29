@@ -33,8 +33,11 @@ namespace TLScope.src {
 
                 top.Add(_networkView);
 
-                // Subscribe to the Application.Resized event
                 Application.Resized += OnTerminalResized;
+                Application.MainLoop.AddIdle(() => {
+                    Application.Refresh();
+                    return false;
+                });
 
                 // Run network discovery and UI updates in a single task
                 Task.Run(() => DiscoverAndUpdateNetwork(_cancellationTokenSource.Token));

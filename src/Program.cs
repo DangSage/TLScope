@@ -25,13 +25,7 @@ namespace TLScope.src {
                     ?? throw new InvalidOperationException("CLIController service is null.");
                 cliController.RunCLI();
 
-                // Login is successful, start the main application
-                var networkController = serviceProvider.GetService<NetworkController>();
-
-                if (networkController == null) {
-                    throw new InvalidOperationException("NetworkController service is null.");
-                }
-                var mainApp = new MainApplication(networkController);
+                var mainApp = new MainApplication();
                 mainApp.Run();
                 // clean up
                 serviceProvider.Dispose();

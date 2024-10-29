@@ -7,13 +7,11 @@ using TLScope.src.Debugging;
 
 namespace TLScope.src.Controllers {
     public class NetworkController {
-        private readonly NetworkService _networkService;
         private ConcurrentDictionary<string, Device> _activeDevices = new();
 
         public event Action<ConcurrentDictionary<string, Device>>? DevicesUpdated;
 
-        public NetworkController(NetworkService networkService) {
-            _networkService = networkService ?? throw new ArgumentNullException(nameof(networkService));
+        public NetworkController() {
             Logging.Write("NetworkController initialized.");
         }
 
@@ -25,8 +23,8 @@ namespace TLScope.src.Controllers {
                     return _activeDevices;
                 }
 
-                var scanTask = _networkService.ScanNetworkAsync(localIPAddress, _activeDevices, cancellationToken);
-                var pingTask = _networkService.PingDevicesAsync(_activeDevices, cancellationToken);
+                var scanTask = NetworkService.ScanNetworkAsync(localIPAddress, _activeDevices, cancellationToken);
+                var pingTask = NetworkService.PingDevicesAsync(_activeDevices, cancellationToken);
 
                 await Task.WhenAll(scanTask, pingTask);
                 Logging.Write("Network discovery completed.");
@@ -48,20 +46,17 @@ namespace TLScope.src.Controllers {
             return ref _activeDevices;
         }
 
-        private static string GetLocalIPAddress() {
+        private static string? GetLocalIPAddress() {
             foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces()) {
-                if (networkInterface.OperationalStatus == OperationalStatus.Up &&
-                    (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
-                     networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)) {
+                if (networkInterface.OperationalStatus == OperationalStatus.Up) {
                     foreach (var unicastAddress in networkInterface.GetIPProperties().UnicastAddresses) {
                         if (unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork) {
-                            Logging.Write($"Hosting from Local IP Address: {unicastAddress.Address}");
                             return unicastAddress.Address.ToString();
                         }
                     }
                 }
             }
-            throw new Exception("Local IP Address Not Found! Are you connected to WiFi?");
+            return null;
         }
     }
 }

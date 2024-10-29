@@ -11,7 +11,7 @@ namespace TLScope.src.Services {
     public class NetworkService {
         private const int MaxParallelism = 3; // Limit the number of parallel tasks
 
-        public async Task ScanNetworkAsync(string localIPAddress, ConcurrentDictionary<string, Device> activeDevices, CancellationToken cancellationToken) {
+        public static async Task ScanNetworkAsync(string localIPAddress, ConcurrentDictionary<string, Device> activeDevices, CancellationToken cancellationToken) {
             var subnetMask = GetSubnetMask(localIPAddress);
             var ipRange = GetIPRange(localIPAddress, subnetMask);
         
@@ -48,12 +48,14 @@ namespace TLScope.src.Services {
             Logging.Write("Network scanning stopped.");
         }
 
-        public async Task PingDevicesAsync(ConcurrentDictionary<string, Device> activeDevices, CancellationToken cancellationToken) {
+        public static async Task PingDevicesAsync(ConcurrentDictionary<string, Device> activeDevices, CancellationToken cancellationToken) {
             var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = MaxParallelism, CancellationToken = cancellationToken };
 
             // ICMP Pinging for verification with Parallel Processing
             while (!cancellationToken.IsCancellationRequested) {
-                Parallel.ForEach(activeDevices.Keys, parallelOptions, async ip => {
+                var deviceKeys = activeDevices.Keys.ToList(); // Create a separate list of keys
+
+                await Task.WhenAll(deviceKeys.Select(async ip => {
                     using (var ping = new Ping()) {
                         try {
                             PingReply reply = await ping.SendPingAsync(ip, 3000);
@@ -63,13 +65,15 @@ namespace TLScope.src.Services {
                                     Logging.Write($"TIMEOUT: {ip} is inactive. Removed from activeDevices list.");
                                 }
                             }
+                            Logging.Write($"PING: {ip} - {reply.Status}");
                         } catch (PingException ex) {
                             Logging.Write($"Ping failed for {ip}: {ex.Message}");
                         } catch (Exception ex) {
                             Logging.Write($"Error checking device status for {ip}: {ex.Message}");
                         }
                     }
-                });
+                }));
+
                 try {
                     await Task.Delay(100, cancellationToken); // Throttle speed by adding a delay
                 } catch (TaskCanceledException) {

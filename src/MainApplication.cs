@@ -1,7 +1,3 @@
-using System;
-using System.Diagnostics.Tracing;
-using System.Threading;
-using System.Threading.Tasks;
 using Terminal.Gui;
 using TLScope.src.Controllers;
 using TLScope.src.Debugging;
@@ -10,12 +6,13 @@ using TLScope.src.Views;
 
 namespace TLScope.src {
     public class MainApplication {
-        private NetworkController _networkController;
-        private NetworkView? _networkView;
+        private readonly NetworkController _networkController;
+        private readonly NetworkView _networkView;
         private readonly CancellationTokenSource _cancellationTokenSource = new();
 
-        public MainApplication(NetworkController networkController) {
-            _networkController = networkController ?? throw new ArgumentNullException(nameof(networkController));
+        public MainApplication() {
+            _networkController = new NetworkController();
+            _networkView = new NetworkView(ref _networkController);
             Logging.Write("MainApplication initialized.");
         }
 
@@ -25,11 +22,7 @@ namespace TLScope.src {
 
                 Application.Init();
                 Application.UseSystemConsole = false;
-                Application.Resized -= OnTerminalResized;
                 var top = Application.Top;
-
-                // Pass the existing NetworkController instance to NetworkView
-                _networkView = new NetworkView(ref _networkController);
 
                 top.Add(new MenuBar(new MenuBarItem[] {
                     new MenuBarItem("_File", new MenuItem[] {
@@ -43,8 +36,8 @@ namespace TLScope.src {
                 // Subscribe to the Application.Resized event
                 Application.Resized += OnTerminalResized;
 
-                // Run network discovery and UI updates in separate tasks
-                Task.Run(() => DiscoverNetwork(_cancellationTokenSource.Token));
+                // Run network discovery and UI updates in a single task
+                Task.Run(() => DiscoverAndUpdateNetwork(_cancellationTokenSource.Token));
 
                 Application.Run();
             } catch (Exception ex) {
@@ -62,10 +55,11 @@ namespace TLScope.src {
             }
         }
 
-        private async Task DiscoverNetwork(CancellationToken cancellationToken) {
+        private async Task DiscoverAndUpdateNetwork(CancellationToken cancellationToken) {
             try {
                 while (!cancellationToken.IsCancellationRequested) {
                     await _networkController.DiscoverLocalNetworkAsync(cancellationToken);
+                    Application.MainLoop.Invoke(() => _networkView.UpdateView());
                     await Task.Delay(5000, cancellationToken);
                 }
             } catch (OperationCanceledException) {
@@ -76,8 +70,13 @@ namespace TLScope.src {
         }
 
         private void OnTerminalResized(Application.ResizedEventArgs args) {
-            // Handle the terminal resize event
-            _networkView?.SetNeedsDisplay();
+            try {
+                // Handle the terminal resize event
+                _networkView.SetNeedsDisplay();
+                Logging.Write("Terminal resized.");
+            } catch (Exception ex) {
+                Logging.Error("An error occurred during terminal resize.", ex);
+            }
         }
     }
 }

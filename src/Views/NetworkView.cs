@@ -1,22 +1,20 @@
 using System.Collections.Concurrent;
-using System.Threading;
+
 using Terminal.Gui;
 using Terminal.Gui.Trees;
+
 using TLScope.src.Debugging;
 using TLScope.src.Models;
 using TLScope.src.Controllers;
 using TLScope.src.Utilities;
-using Microsoft.Msagl.Core.Layout;
 
 namespace TLScope.src.Views {
     public class NetworkView : Window {
         private readonly TreeView _deviceTreeView;
         private readonly NetworkController _networkController;
-        private Timer _debounceTimer;
 
         public NetworkView(ref NetworkController networkController) : base("Network Information") {
             _networkController = networkController ?? throw new ArgumentNullException(nameof(networkController));
-            _debounceTimer = new Timer(_ => { }, null, Timeout.Infinite, Timeout.Infinite);
             X = 1;
             Y = 2;
             Width = Dim.Fill() - 2;
@@ -32,20 +30,16 @@ namespace TLScope.src.Views {
             };
 
             Add(_deviceTreeView);
-
-            _networkController.DevicesUpdated += OnDevicesUpdated;
         }
 
-        private void Debounce(Action action, int delayMilliseconds) {
-            _debounceTimer?.Change(delayMilliseconds, Timeout.Infinite);
-        }
-
-        private void OnDevicesUpdated(ConcurrentDictionary<string, Device> devices) {
-            Debounce(() => Application.MainLoop.Invoke(() => {
-                _deviceTreeView.TreeBuilder = new DeviceTreeBuilder(ref devices);
+        public void UpdateView() {
+            try {
+                _deviceTreeView.TreeBuilder = new DeviceTreeBuilder(ref _networkController.GetActiveDevices());
                 _deviceTreeView.SetNeedsDisplay();
-                Logging.Write($"Device list updated: {devices.Count} devices.");
-            }), 1000);
+                Logging.Write($"Device list updated: {_networkController.GetActiveDevices().Count} devices.");
+            } catch (Exception ex) {
+                Logging.Error("An error occurred while updating the view.", ex);
+            }
         }
 
         public class DeviceTreeBuilder : ITreeBuilder<ITreeNode> {

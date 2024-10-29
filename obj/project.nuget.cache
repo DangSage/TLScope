@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "gatkDFvi16HXR76st9So+bMIDDs7FQUCo4Pup2LNiJTQWb6KeQnVjnELvas8I21cHNAmkC0i+E3FJjuv48OS1A==",
+  "dgSpecHash": "BfTBmKvRJVUitOt3DbKbDbpcIg9ClwYAjpr2wHVQ66s89+3ovq5PD+wgyO78FY2obJHSmAlCHJ+y9f/VQkV2MQ==",
   "success": true,
   "projectFilePath": "/home/khai/Documents/TLScope/TLScope.csproj",
   "expectedPackageFiles": [
@@ -135,7 +135,7 @@
     "/home/khai/.nuget/packages/xunit.core/2.9.2/xunit.core.2.9.2.nupkg.sha512",
     "/home/khai/.nuget/packages/xunit.extensibility.core/2.9.2/xunit.extensibility.core.2.9.2.nupkg.sha512",
     "/home/khai/.nuget/packages/xunit.extensibility.execution/2.9.2/xunit.extensibility.execution.2.9.2.nupkg.sha512",
-    "/home/khai/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.8/microsoft.aspnetcore.app.ref.8.0.8.nupkg.sha512"
+    "/home/khai/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.10/microsoft.aspnetcore.app.ref.8.0.10.nupkg.sha512"
   ],
   "logs": []
 }

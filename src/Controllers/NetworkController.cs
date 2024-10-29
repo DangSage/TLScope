@@ -8,7 +8,7 @@ using TLScope.src.Debugging;
 namespace TLScope.src.Controllers {
     public class NetworkController {
         private readonly NetworkService _networkService;
-        private readonly ConcurrentDictionary<string, Device> _activeDevices = new();
+        private ConcurrentDictionary<string, Device> _activeDevices = new();
 
         public event Action<ConcurrentDictionary<string, Device>>? DevicesUpdated;
 
@@ -17,12 +17,12 @@ namespace TLScope.src.Controllers {
             Logging.Write("NetworkController initialized.");
         }
 
-        public async Task DiscoverLocalNetworkAsync(CancellationToken cancellationToken) {
+        public async Task<ConcurrentDictionary<string, Device>> DiscoverLocalNetworkAsync(CancellationToken cancellationToken) {
             try {
                 var localIPAddress = GetLocalIPAddress();
                 if (localIPAddress == null) {
                     Logging.Error("Local IP Address not found. Network discovery aborted.");
-                    return;
+                    return _activeDevices;
                 }
 
                 var scanTask = _networkService.ScanNetworkAsync(localIPAddress, _activeDevices, cancellationToken);
@@ -36,14 +36,16 @@ namespace TLScope.src.Controllers {
             } catch (Exception ex) {
                 Logging.Error("An error occurred during network discovery.", ex);
             }
+
+            return _activeDevices;
         }
 
         private void OnDevicesUpdated() {
             DevicesUpdated?.Invoke(_activeDevices);
         }
 
-        public ConcurrentDictionary<string, Device> GetActiveDevices() {
-            return _activeDevices;
+        public ref ConcurrentDictionary<string, Device> GetActiveDevices() {
+            return ref _activeDevices;
         }
 
         private static string GetLocalIPAddress() {

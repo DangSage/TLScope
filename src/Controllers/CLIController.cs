@@ -30,7 +30,7 @@ namespace TLScope.src.Controllers {
                         DisplayHelp();
                         break;
                     case "--github":
-                        OpenGitHubRepository();
+                        ConsoleHelper.OpenGitHubRepository();
                         break;
                     case "--register":
                         CreateAccount();
@@ -55,19 +55,6 @@ namespace TLScope.src.Controllers {
             Console.WriteLine("  --help       Display this help message");
             Console.WriteLine("  --github     Open the GitHub repository");
             Console.WriteLine("  --register   Register a new user");
-        }
-
-        private void OpenGitHubRepository() {
-            Console.WriteLine("Opening the GitHub repository...");
-            try {
-                var psi = new ProcessStartInfo {
-                    FileName = Constants.RepositoryUrl,
-                    UseShellExecute = true
-                };
-                Process.Start(psi);
-            } catch (Exception ex) {
-                Logging.Error($"Failed to open the GitHub repository", ex);
-            }
         }
 
         private void CreateAccount() {

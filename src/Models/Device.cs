@@ -30,29 +30,6 @@ namespace TLScope.src.Models {
         // Navigation property
         public virtual User? User { get; set; }
 
-        // Navigation properties
-        public virtual ICollection<ENetworkInterface> ENetworkInterfaces { get; set; } = new List<ENetworkInterface>();
     }
 
-    public class ENetworkInterface {
-        [Key]
-        public int Id { get; set; }
-
-        [Required]
-        [StringLength(50)]
-        public string InterfaceName { get; set; } = string.Empty;
-
-        [Required]
-        [StringLength(15)]
-        public string IPAddress { get; set; } = string.Empty;
-
-        [Required]
-        [StringLength(17)]
-        public string MACAddress { get; set; } = string.Empty;
-
-        public int DeviceId { get; set; }
-
-        // Navigation property
-        public virtual Device? Device { get; set; }
-    }
 }

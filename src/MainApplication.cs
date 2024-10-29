@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.Tracing;
 using System.Threading;
 using System.Threading.Tasks;
 using Terminal.Gui;
@@ -9,7 +10,7 @@ using TLScope.src.Views;
 
 namespace TLScope.src {
     public class MainApplication {
-        private readonly NetworkController _networkController;
+        private NetworkController _networkController;
         private NetworkView? _networkView;
         private readonly CancellationTokenSource _cancellationTokenSource = new();
 
@@ -28,20 +29,12 @@ namespace TLScope.src {
                 var top = Application.Top;
 
                 // Pass the existing NetworkController instance to NetworkView
-                _networkView = new NetworkView(_networkController);
+                _networkView = new NetworkView(ref _networkController);
 
-                var win = new Window("Welcome to TLScope (Ctrl+Q to quit)") {
-                    X = 0,
-                    Y = 1, // Leave one row for the menu
-                    Width = Dim.Fill(),
-                    Height = Dim.Fill(),
-                    CanFocus = false,
-                    ColorScheme = Constants.TLSColorScheme
-                };
-                top.Add(win);
                 top.Add(new MenuBar(new MenuBarItem[] {
                     new MenuBarItem("_File", new MenuItem[] {
-                        new MenuItem("_Quit", "", () => Application.RequestStop(), null, null, Key.CtrlMask | Key.Q)
+                        new MenuItem("_GitHub", "", () => ConsoleHelper.OpenGitHubRepository(), null, null, Key.CtrlMask | Key.G),
+                        new MenuItem("_Quit", "", () => Application.RequestStop(), null, null, Key.CtrlMask | Key.Q),
                     })
                 }));
 
@@ -51,7 +44,6 @@ namespace TLScope.src {
                 Application.Resized += OnTerminalResized;
 
                 // Run network discovery and UI updates in separate tasks
-                Task.Run(() => UpdateNetworkView(_cancellationTokenSource.Token));
                 Task.Run(() => DiscoverNetwork(_cancellationTokenSource.Token));
 
                 Application.Run();
@@ -80,28 +72,6 @@ namespace TLScope.src {
                 Logging.Write("Network discovery was canceled.");
             } catch (Exception ex) {
                 Logging.Error("An error occurred during network discovery.", ex);
-            }
-        }
-
-        private async Task UpdateNetworkView(CancellationToken cancellationToken) {
-            if (_networkView == null) {
-                throw new InvalidOperationException("NetworkView is null.");
-            }
-
-            try {
-                while (!cancellationToken.IsCancellationRequested) {
-                    await Task.Delay(1000, cancellationToken); // Throttle UI updates to once per second
-                    _networkView.UpdateDeviceList();
-                }
-            } catch (OperationCanceledException) {
-                Logging.Write("UI update was canceled.");
-            } catch (IndexOutOfRangeException ex) {
-                Logging.Error("An error occurred during UI update.", ex);
-                // Add additional logging to capture the state
-                Logging.Write($"Exception Details: {ex.Message}");
-                Logging.Write($"Stack Trace: {ex.StackTrace}");
-            } catch (Exception ex) {
-                Logging.Error("An error occurred during UI update.", ex);
             }
         }
 

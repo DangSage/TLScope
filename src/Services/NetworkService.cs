@@ -14,67 +14,69 @@ namespace TLScope.src.Services {
         public async Task ScanNetworkAsync(string localIPAddress, ConcurrentDictionary<string, Device> activeDevices, CancellationToken cancellationToken) {
             var subnetMask = GetSubnetMask(localIPAddress);
             var ipRange = GetIPRange(localIPAddress, subnetMask);
-
+        
             var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = MaxParallelism, CancellationToken = cancellationToken };
-
+            var lockObject = new object();
+        
             // ARP Scanning with Parallel Processing
-            await Task.Run(async () => {
-                while (!cancellationToken.IsCancellationRequested) {
-                    if (activeDevices.Count < 16) {
-                        Parallel.ForEach(ipRange, parallelOptions, ip => {
-                            if (ip == localIPAddress) return;
-                            if (IsDeviceActive(ip)) {
-                                Device _device = new Device {
-                                    DeviceName = ip,
-                                    IPAddress = ip
-                                };
-                                if (activeDevices.AddOrUpdate(ip, _device, (key, value) => value) == _device) {
-                                    Logging.Write($"{ip} is active. Added to activeDevices list.");
+            while (!cancellationToken.IsCancellationRequested) {
+                if (activeDevices.Count < 16) {
+                    Parallel.ForEach(ipRange, parallelOptions, ip => {
+                        if (ip == localIPAddress) return;
+                        if (IsDeviceActive(ip)) {
+                            Device _device = new() {
+                                DeviceName = ip,
+                                IPAddress = ip
+                            };
+
+                            lock (lockObject) {
+                                if (activeDevices.Count < 16) {
+                                    if (activeDevices.AddOrUpdate(ip, _device, (key, value) => value) == _device) {
+                                        Logging.Write($"{ip} is active. Added to activeDevices list. Total: {activeDevices.Count}");
+                                    }
                                 }
                             }
-                        });
-                    }
-                    try {
-                        await Task.Delay(5000, cancellationToken); // Delay for 5 seconds before next scan
-                    } catch (TaskCanceledException) {
-                        break;
-                    }
+                        }
+                    });
                 }
-                Logging.Write("Network scanning stopped.");
-            }, cancellationToken);
+                try {
+                    await Task.Delay(5000, cancellationToken); // Delay for 5 seconds before next scan
+                } catch (TaskCanceledException) {
+                    break;
+                }
+            }
+            Logging.Write("Network scanning stopped.");
         }
 
         public async Task PingDevicesAsync(ConcurrentDictionary<string, Device> activeDevices, CancellationToken cancellationToken) {
             var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = MaxParallelism, CancellationToken = cancellationToken };
 
             // ICMP Pinging for verification with Parallel Processing
-            await Task.Run(async () => {
-                while (!cancellationToken.IsCancellationRequested) {
-                    Parallel.ForEach(activeDevices.Keys, parallelOptions, async ip => {
-                        using (var ping = new Ping()) {
-                            try {
-                                PingReply reply = await ping.SendPingAsync(ip, 3000);
+            while (!cancellationToken.IsCancellationRequested) {
+                Parallel.ForEach(activeDevices.Keys, parallelOptions, async ip => {
+                    using (var ping = new Ping()) {
+                        try {
+                            PingReply reply = await ping.SendPingAsync(ip, 3000);
 
-                                if (reply.Status != IPStatus.Success) {
-                                    if (activeDevices.TryRemove(ip, out _)) {
-                                        Logging.Write($"TIMEOUT: {ip} is inactive. Removed from activeDevices list.");
-                                    }
+                            if (reply.Status != IPStatus.Success) {
+                                if (activeDevices.TryRemove(ip, out _)) {
+                                    Logging.Write($"TIMEOUT: {ip} is inactive. Removed from activeDevices list.");
                                 }
-                            } catch (PingException ex) {
-                                Logging.Write($"Ping failed for {ip}: {ex.Message}");
-                            } catch (Exception ex) {
-                                Logging.Write($"Error checking device status for {ip}: {ex.Message}");
                             }
+                        } catch (PingException ex) {
+                            Logging.Write($"Ping failed for {ip}: {ex.Message}");
+                        } catch (Exception ex) {
+                            Logging.Write($"Error checking device status for {ip}: {ex.Message}");
                         }
-                    });
-                    try {
-                        await Task.Delay(100, cancellationToken); // Throttle speed by adding a delay
-                    } catch (TaskCanceledException) {
-                        break;
                     }
+                });
+                try {
+                    await Task.Delay(100, cancellationToken); // Throttle speed by adding a delay
+                } catch (TaskCanceledException) {
+                    break;
                 }
-                Logging.Write("Device pinging stopped.");
-            }, cancellationToken);
+            }
+            Logging.Write("Device pinging stopped.");
         }
 
         private static string GetSubnetMask(string ipAddress) {

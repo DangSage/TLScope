@@ -158,7 +158,7 @@ namespace TLScope.src.Controllers {
 
             try {
                 VersionInfo.TLScopeVersionCheck();
-                bool userExists = _dbContext.Users.AsNoTracking().Any(); // Use no-tracking query
+                bool userExists = _dbContext.Users.AsNoTracking().Any();
                 if (!userExists) {
                     Console.WriteLine("No users found. Please create an account.");
                     CreateAccount();

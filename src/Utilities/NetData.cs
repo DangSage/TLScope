@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using TLScope.src.Debugging;
 
 namespace TLScope.src.Utilities {
-    public static partial class NData {
+    public static partial class NetData {
         private static readonly Regex arpReg = MyRegex();
         public static string? GetLocalIPAddress(NetworkInterface ni) {
             return ni.GetIPProperties().UnicastAddresses

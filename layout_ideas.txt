@@ -19,7 +19,7 @@ TLScope/
 |   |   ├── Crypto.cs
 │   │   └── GraphUtility.cs
 │   ├── Views/
-│   │   └── NetworkView.cs
+│   │   └── NetView.cs
 │   └── Data/
 │       └── ApplicationDbContext.cs
 

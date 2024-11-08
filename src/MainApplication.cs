@@ -10,12 +10,12 @@ using TLScope.src.Views;
 namespace TLScope.src {
     public class MainApplication {
         private NetworkController _networkController;
-        private readonly NetworkView _networkView;
+        private readonly NetView _networkView;
         private readonly CancellationTokenSource _cancellationTokenSource;
 
         public MainApplication(NetworkController networkController) {
             _networkController = networkController ?? throw new ArgumentNullException(nameof(networkController));
-            _networkView = new NetworkView(ref _networkController);
+            _networkView = new NetView(ref _networkController);
             _cancellationTokenSource = new CancellationTokenSource();
         }
 

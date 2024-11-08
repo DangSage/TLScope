@@ -1,5 +1,5 @@
 // Network Controller to handle all network operations in the application at a high-level
-// For specific functionality, see NData.cs in Utilities
+// For specific functionality, see NetData.cs in Utilities
 
 using System.Collections.Concurrent;
 using System.Net.NetworkInformation;
@@ -35,8 +35,8 @@ namespace TLScope.src.Controllers {
                 }
                 Logging.Write(
                     $"Hosting from Interface {_networkInterface.Name}\n" +
-                    $"\tIP Address: {NData.GetLocalIPAddress(_networkInterface)}\n" +
-                    $"\tMAC Address: {NData.GetLocalMacAddress(_networkInterface)}"
+                    $"\tIP Address: {NetData.GetLocalIPAddress(_networkInterface)}\n" +
+                    $"\tMAC Address: {NetData.GetLocalMacAddress(_networkInterface)}"
                 );
 
                 var scanTask = NetworkService.ScanNetworkAsync(_activeDevices, cancTok);

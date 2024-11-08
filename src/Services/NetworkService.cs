@@ -20,7 +20,7 @@ namespace TLScope.src.Services {
                         continue;
                     }
 
-                    var list = NData.ARPCommand(10);
+                    var list = NetData.ARPCommand(10);
                     for (int i = 0; i < list.Count; i++) {
                         (string IP, string MACAddress) _dev = list[i];
                         if (cancellationToken.IsCancellationRequested) {

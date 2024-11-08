@@ -36,7 +36,7 @@ In GraphUtility.cs, create methods for graph creation, manipulation, and analysi
 
 Design the user interface:
 
-In NetworkView.cs, implement the text-based UI using Terminal.Gui for visualizing the network and TLS connections.
+In NetView.cs, implement the text-based UI using Terminal.Gui for visualizing the network and TLS connections.
 
 
 Set up the main program:

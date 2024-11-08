@@ -1,17 +1,21 @@
+// Window class to display network information, including active devices and their information
+
 using System.Collections.Concurrent;
-using System.Linq;
+
 using Terminal.Gui;
+
 using TLScope.src.Controllers;
 using TLScope.src.Utilities;
 using TLScope.src.Debugging;
 using TLScope.src.Models;
 
+
 namespace TLScope.src.Views {
-    public class NetworkView : Window {
+    public class NetView : Window {
         private readonly TreeView _deviceTreeView;
         private bool _isVisible;
 
-        public NetworkView(ref NetworkController networkController) : base("Network Information") {
+        public NetView(ref NetworkController networkController) : base("Network Information") {
             X = 1;
             Y = 2;
             Width = Dim.Fill() - 2;

@@ -1,6 +1,5 @@
-using System;
-using System.Linq;
-using System.Diagnostics;
+// Command Line Interface for TLScope, distinguishing behaviour between the application and command-line arguments
+// Arguments can be passed and serve their one time use/purpose
 
 using TLScope.src.Models;
 using TLScope.src.Utilities;
@@ -140,9 +139,6 @@ namespace TLScope.src.Controllers {
             }
 
             Console.ResetColor();
-            Console.WriteLine("Login successful. Press any key to continue.");
-            // get any key input
-            Console.ReadKey();
             return true;
         }
 

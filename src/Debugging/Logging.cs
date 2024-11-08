@@ -1,78 +1,72 @@
+using System;
+using System.Collections.Concurrent;
+using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+
+using TLScope.src.Utilities;
 
 namespace TLScope.src.Debugging {
     public static class Logging {
-        private static readonly string logDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
-        private static readonly string logFile = Path.Combine(logDirectory, "latest.log");
-
-        private static readonly string initTime = $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff}";
-
-        static Logging() {
-            // Ensure the log directory exists
-            Directory.CreateDirectory(logDirectory);
-
-            // If log file already exists (contains data), append 2 new lines
-            using StreamWriter sw = new(logFile, false);
-            if (sw.BaseStream.Length > 0) {
-                sw.WriteLine();
-                sw.WriteLine();
-            }
-
-            sw.WriteLine($"======= Logging Session. {initTime} =======");
-            AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
+        private static readonly BlockingCollection<string> logQueue = new();
+        private static readonly CancellationTokenSource cts = new();
+        private static readonly Task logTask = Task.Run(ProcessLogQueue, cts.Token);
+        private static readonly string logFile = Path.Combine(Utilities.Environment.LogPath, "tlscope.log");
+        
+        public static void Write(string message) {
+            logQueue.Add($"[{DateTime.Now:HH:mm:ss.fff}] {message}");
         }
 
-        public static void Write(string message,
-                                 [CallerFilePath] string filePath = "",
-                                 [CallerLineNumber] int lineNumber = 0,
-                                 [CallerMemberName] string memberName = "") {
-            string fileName = Path.GetFileName(filePath);
-            string logMessage = $"[{DateTime.Now:HH:mm:ss.fff}] {fileName}:{lineNumber} ({memberName}) - {message}";
-            using StreamWriter sw = new(logFile, true);  // Append mode
-            sw.WriteLine(logMessage);
-        }
-
-        public static void Error(string message, Exception? ex = null, bool isFatal = false,
-                                 [CallerFilePath] string filePath = "",
-                                 [CallerLineNumber] int lineNumber = 0,
-                                 [CallerMemberName] string memberName = "") {
-            string fileName = Path.GetFileName(filePath);
-            string logMessage = $"[{DateTime.Now:HH:mm:ss.fff}] ERROR was caught @ {fileName}:{lineNumber} ({memberName}) - '{message}'";
-            if (ex != null) {
-                logMessage += $"\n\t└> {ex.GetType().Name}: {ex.Message}\n\t└> Stack Trace: {ex.StackTrace}";
-                // Full exception details
-                logMessage += ex.InnerException != null ? $"\n\t└> Inner Exception: {ex.InnerException.Message}" : "";
-            }
-
-            using StreamWriter sw = new(logFile, true);  // Append mode
-            sw.WriteLine(logMessage);
-            sw.Flush();
+        public static void Error(string message, Exception ex, bool isFatal = false) {
+            var logMessage = $"[{DateTime.Now:HH:mm:ss.fff}] ERROR: {message}";
+            logMessage += $"\n\t└> {ex.GetType().Name}: {ex.Message}\n\t└> Stack Trace: {ex.StackTrace}";
+            logMessage += ex.InnerException != null ? $"\n\t└> Inner Exception: {ex.InnerException.Message}" : "";
+            logQueue.Add(logMessage);
 
             if (isFatal) {
-                Console.ForegroundColor = ConsoleColor.Red; // Set text color to red
+                Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine(logMessage);
                 Console.WriteLine("\nThis error is fatal. See log file for more details.");
-                sw.WriteLine($"FATAL: CLOSING APPLICATION");
-                sw.Flush();
-                sw.Close();
-                Console.ResetColor(); // Reset text color to default
-                Environment.Exit(1);
+                logQueue.Add("FATAL: CLOSING APPLICATION");
+                cts.Cancel();
+                try {
+                    logTask.Wait();
+                } catch (AggregateException ae) {
+                    ae.Handle(ex => ex is TaskCanceledException);
+                }
+                Console.ResetColor();
+                OnProcessExit(null, EventArgs.Empty);
+                System.Environment.Exit(1);
             }
-            sw.Close();
+        }
+
+        private static async Task ProcessLogQueue() {
+            using StreamWriter sw = new(logFile, false) {
+                AutoFlush = true
+            };
+            await sw.WriteLineAsync($"======= Logging Session Started. {DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff} =======");
+            foreach (var logMessage in logQueue.GetConsumingEnumerable(cts.Token)) {
+                await sw.WriteLineAsync(logMessage);
+            }
         }
 
         private static void OnProcessExit(object? sender, EventArgs e) {
-            // Perform any necessary cleanup here
-            using StreamWriter sw = new(logFile, true);  // Append mode
+            cts.Cancel();
+            try {
+                logTask.Wait();
+            } catch (AggregateException ae) {
+                ae.Handle(ex => ex is TaskCanceledException);
+            }
+
+            using StreamWriter sw = new(logFile, true);
             sw.WriteLine($"======= Logging Session Ended. {DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff} =======");
 
-            // copy the log file to a latest.log file
-            string latestLogFile = Path.Combine(logDirectory, $"{initTime}.log");
+            string latestLogFile = Path.Combine(Utilities.Environment.LogPath, $"{DateTime.Now:yyyy-MM-dd-HH-mm-ss-fff}.log");
             File.Copy(logFile, latestLogFile, true);
         }
 
         public static void MakeLogFileWritable() {
-            // Remove the ReadOnly attribute
             if (File.Exists(logFile)) {
                 File.SetAttributes(logFile, FileAttributes.Normal);
             }

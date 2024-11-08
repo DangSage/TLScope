@@ -1,36 +1,49 @@
+// Network Controller to handle all network operations in the application at a high-level
+// For specific functionality, see NData.cs in Utilities
+
 using System.Collections.Concurrent;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
-
 using TLScope.src.Services;
 using TLScope.src.Models;
 using TLScope.src.Debugging;
+using TLScope.src.Utilities;
 
 namespace TLScope.src.Controllers {
     public class NetworkController {
         private ConcurrentDictionary<string, Device> _activeDevices = new();
 
-        public event Action<ConcurrentDictionary<string, Device>>? DevicesUpdated;
+        private readonly NetworkInterface? _networkInterface;
 
         public NetworkController() {
+            // Initialize the network interface (example: get the first network interface)
+            _networkInterface = NetworkInterface.GetAllNetworkInterfaces().LastOrDefault();
+            if (_networkInterface == null) {
+                throw new InvalidOperationException("Network interface is null");
+            }
+            if (_networkInterface.OperationalStatus.ToString() == "Down") {
+                throw new InvalidOperationException(
+                    $"Network Interface ({_networkInterface.Name}) is offline. "+
+                    $"Make sure you are connected to the Internet.");
+            }
             Logging.Write("NetworkController initialized.");
         }
 
-        public async Task DiscoverLocalNetworkAsync(CancellationToken cancellationToken) {
+        public async Task DiscoverLocalNetworkAsync(CancellationToken cancTok) {
             try {
-                var localIPAddress = GetLocalIPAddress();
-                if (localIPAddress == null) {
-                    Logging.Error("Local IP Address not found. Network discovery aborted.");
-                    return;
+                if (_networkInterface == null) {
+                    throw new InvalidOperationException("Network interface is null");
                 }
-                Logging.Write($"Hosting from: {localIPAddress}");
+                Logging.Write(
+                    $"Hosting from Interface {_networkInterface.Name}\n" +
+                    $"\tIP Address: {NData.GetLocalIPAddress(_networkInterface)}\n" +
+                    $"\tMAC Address: {NData.GetLocalMacAddress(_networkInterface)}"
+                );
 
-                var scanTask = Task.Run(() => NetworkService.ScanNetworkAsync(localIPAddress, _activeDevices, cancellationToken));
-                var pingTask = Task.Run(() => NetworkService.PingDevicesAsync(_activeDevices, cancellationToken));
+                var scanTask = NetworkService.ScanNetworkAsync(_activeDevices, cancTok);
+                var pingTask = NetworkService.PingDevicesAsync(_activeDevices, cancTok);
 
                 await Task.WhenAll(scanTask, pingTask);
                 Logging.Write("Network discovery completed.");
-                OnDevicesUpdated();
             } catch (OperationCanceledException) {
                 Logging.Write("Network discovery was canceled.");
             } catch (Exception ex) {
@@ -38,26 +51,8 @@ namespace TLScope.src.Controllers {
             }
         }
 
-        private void OnDevicesUpdated() {
-            DevicesUpdated?.Invoke(_activeDevices);
-        }
-
         public ref ConcurrentDictionary<string, Device> GetActiveDevices() {
             return ref _activeDevices;
-        }
-
-        private static string? GetLocalIPAddress() {
-            foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces()) {
-            if (networkInterface.OperationalStatus == OperationalStatus.Up && 
-                (networkInterface.Name == "wlan0" || networkInterface.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)) {
-                foreach (var unicastAddress in networkInterface.GetIPProperties().UnicastAddresses) {
-                if (unicastAddress.Address.AddressFamily == AddressFamily.InterNetwork) {
-                    return unicastAddress.Address.ToString();
-                }
-                }
-            }
-            }
-            return null;
         }
     }
 }

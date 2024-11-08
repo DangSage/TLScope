@@ -5,6 +5,8 @@ using TLScope.src.Services;
 using TLScope.src.Controllers;
 using TLScope.src.Utilities;
 using TLScope.src.Debugging;
+using Microsoft.Msagl.Layout.Layered;
+using Xunit;
 
 namespace TLScope.src {
     class Program {
@@ -25,14 +27,18 @@ namespace TLScope.src {
                     ?? throw new InvalidOperationException("CLIController service is null.");
                 cliController.RunCLI();
 
-                var mainApp = new MainApplication();
+                var mainApp = new MainApplication(serviceProvider.GetService<NetworkController>()
+                    ?? throw new InvalidOperationException("NetworkController service is null."));
                 mainApp.Run();
                 // clean up
                 serviceProvider.Dispose();
 
+            } catch (InvalidOperationException ex) {
+                Logging.Write(ex.Message);
+                Console.WriteLine($"{ex.Message}");
             } catch (Exception ex) {
+                Logging.Error("Fatal Error caught in main application", ex, true);
                 Console.WriteLine($"An error occurred: {ex.Message}");
-                Logging.Error("An error occurred in the main application. (NOT Caught)", ex, true);
             } finally {
                 Logging.Write("Exiting TLScope...");
                 Console.WriteLine(Constants.GoodbyeMessage);

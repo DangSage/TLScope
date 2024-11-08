@@ -1,20 +1,17 @@
 using System.Collections.Concurrent;
-
+using System.Linq;
 using Terminal.Gui;
-using Terminal.Gui.Trees;
-
-using TLScope.src.Debugging;
-using TLScope.src.Models;
 using TLScope.src.Controllers;
 using TLScope.src.Utilities;
+using TLScope.src.Debugging;
+using TLScope.src.Models;
 
 namespace TLScope.src.Views {
     public class NetworkView : Window {
         private readonly TreeView _deviceTreeView;
-        private readonly NetworkController _networkController;
+        private bool _isVisible;
 
         public NetworkView(ref NetworkController networkController) : base("Network Information") {
-            _networkController = networkController ?? throw new ArgumentNullException(nameof(networkController));
             X = 1;
             Y = 2;
             Width = Dim.Fill() - 2;
@@ -23,55 +20,62 @@ namespace TLScope.src.Views {
 
             _deviceTreeView = new TreeView {
                 X = 0,
-                Y = 0,
+                Y = 2,
                 Width = Dim.Fill() - 2,
                 Height = Dim.Fill() - 2,
-                TreeBuilder = new DeviceTreeBuilder(ref _networkController.GetActiveDevices())
+                CanFocus = true,
+                TreeBuilder = new DeviceTreeBuilder(ref networkController.GetActiveDevices())
             };
 
             Add(_deviceTreeView);
+
+            // Event handlers for visibility
+            VisibleChanged += OnVisibleChanged;
         }
 
-        public void UpdateView() {
+        private void OnVisibleChanged(bool isVisible, ref NetworkController nc) {
+            _isVisible = isVisible;
+            if (_isVisible) {
+                UpdateView(ref nc);
+            }
+        }
+
+        private void OnDevicesUpdated(ConcurrentDictionary<string, Device> devices) {
+            if (_isVisible) {
+                Application.MainLoop.Invoke(() => {
+                    _deviceTreeView.TreeBuilder = new DeviceTreeBuilder(ref devices);
+                    _deviceTreeView.SetNeedsDisplay();
+                    Logging.Write($"Device list updated: {devices.Count} devices.");
+                    LogTreeViewContent();
+                });
+            }
+        }
+
+        public void UpdateView(ref NetworkController nc) {
             try {
-                _deviceTreeView.TreeBuilder = new DeviceTreeBuilder(ref _networkController.GetActiveDevices());
-                _deviceTreeView.SetNeedsDisplay();
-                Logging.Write($"Device list updated: {_networkController.GetActiveDevices().Count} devices.");
+                if (_isVisible) {
+                    _deviceTreeView.TreeBuilder = new DeviceTreeBuilder(ref nc.GetActiveDevices());
+                    _deviceTreeView.SetNeedsDisplay();
+                    Logging.Write($"Device list updated: {nc.GetActiveDevices().Count} devices.");
+                    LogTreeViewContent();
+                }
             } catch (Exception ex) {
                 Logging.Error("An error occurred while updating the view.", ex);
             }
         }
 
-        public class DeviceTreeBuilder : ITreeBuilder<ITreeNode> {
-            private readonly ConcurrentDictionary<string, Device> _devices;
-
-            public DeviceTreeBuilder(ref ConcurrentDictionary<string, Device> devices) {
-                _devices = devices;
+        private void LogTreeViewContent() {
+            var rootChildren = _deviceTreeView.TreeBuilder.GetChildren(null);
+            if (!rootChildren.Any()) {
+                Logging.Write("TreeView Root: No devices found.");
+                return;
             }
 
-            public bool IsExpanded(ITreeNode node) {
-                return false; // Simplified: no expanded state tracking
+            var root = rootChildren.First();
+            Logging.Write($"TreeView Root: {root.Text}");
+            foreach (var child in _deviceTreeView.TreeBuilder.GetChildren(root)) {
+                Logging.Write($"TreeView Child: {child.Text}");
             }
-
-            public void SetExpanded(ITreeNode node, bool expanded) {
-                // Simplified: no expanded state tracking
-            }
-
-            public IEnumerable<ITreeNode> GetChildren(ITreeNode node) {
-                // No children needed
-                return Enumerable.Empty<ITreeNode>();
-            }
-
-            public ITreeNode GetRoot() {
-                // Display the number of devices as the root node
-                return new TreeNode($"Number of Devices: {_devices.Count}");
-            }
-
-            public bool CanExpand(ITreeNode node) {
-                return false; // No expandable nodes
-            }
-
-            public bool SupportsCanExpand => false;
         }
     }
 }

@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+using Terminal.Gui.Trees;
 
 namespace TLScope.src.Models {
-    public class Device {
+    public class Device : ITreeNode {
         [Key]
         public int Id { get; set; }
 
@@ -30,6 +33,19 @@ namespace TLScope.src.Models {
         // Navigation property
         public virtual User? User { get; set; }
 
-    }
+        // ITreeNode implementation
+        [NotMapped]
+        public string Text {
+            get => DeviceName;
+            set => DeviceName = value ?? throw new ArgumentNullException(nameof(value));
+        }
 
+        [NotMapped]
+        public object? Tag {
+            get => this;
+            set {}
+        }
+
+        public IList<ITreeNode> Children => new List<ITreeNode>();
+    }
 }

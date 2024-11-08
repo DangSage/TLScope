@@ -1,10 +1,9 @@
-// Purpose: Contains utility classes for TLScope that don't fit into the specific scopes of the project.
+// Miscellaneous utility classes for TLScope that don't fit into the specific scopes of the project.
 
 using System.Reflection;
 using System.Text;
-using System.Collections.Concurrent;
-
 using System.Diagnostics;
+
 using TLScope.src.Debugging;
 
 namespace TLScope.src.Utilities {
@@ -134,6 +133,26 @@ namespace TLScope.src.Utilities {
                 UseShellExecute = true
             };
             Process.Start(psi);
+        }
+
+        public static string ExecuteCommand(string command, string arguments) {
+            var processStartInfo = new ProcessStartInfo {
+                FileName = "/bin/bash",
+                Arguments = $"-c \"{command} {arguments}\"",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = new Process {
+                StartInfo = processStartInfo
+            };
+
+            process.Start();
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            return output;
         }
     }
 }

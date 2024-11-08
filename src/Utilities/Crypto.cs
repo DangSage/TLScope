@@ -1,9 +1,9 @@
-using System;
+// Cryptography utility functions for security in the project
+
 using System.Security.Cryptography;
 using System.Text;
 
 using Konscious.Security.Cryptography;
-
 using TLScope.src.Debugging;
 
 namespace TLScope.src.Utilities {

@@ -12,7 +12,7 @@ namespace TLScope.src.Controllers {
     public class NetworkController {
         private ConcurrentDictionary<string, Device> _activeDevices = new();
 
-        private readonly NetworkInterface? _networkInterface;
+        public readonly NetworkInterface? _networkInterface;
 
         public NetworkController() {
             // Initialize the network interface (example: get the first network interface)

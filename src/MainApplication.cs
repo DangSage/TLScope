@@ -11,11 +11,16 @@ namespace TLScope.src {
     public class MainApplication {
         private NetworkController _networkController;
         private readonly NetView _networkView;
+        private readonly UserView _userView;
         private readonly CancellationTokenSource _cancellationTokenSource;
 
         public MainApplication(NetworkController networkController) {
             _networkController = networkController ?? throw new ArgumentNullException(nameof(networkController));
             _networkView = new NetView(ref _networkController);
+            _userView = new UserView(
+                _networkController._networkInterface ??
+                    throw new ArgumentNullException(nameof(_networkController._networkInterface))
+                );
             _cancellationTokenSource = new CancellationTokenSource();
         }
 
@@ -32,6 +37,7 @@ namespace TLScope.src {
                 }));
 
                 top.Add(_networkView);
+                top.Add(_userView);
 
                 Application.Resized += OnTerminalResized;
                 Application.MainLoop.AddIdle(() => {

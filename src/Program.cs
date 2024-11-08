@@ -5,8 +5,6 @@ using TLScope.src.Services;
 using TLScope.src.Controllers;
 using TLScope.src.Utilities;
 using TLScope.src.Debugging;
-using Microsoft.Msagl.Layout.Layered;
-using Xunit;
 
 namespace TLScope.src {
     class Program {

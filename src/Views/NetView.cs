@@ -15,10 +15,10 @@ namespace TLScope.src.Views {
         private readonly TreeView _deviceTreeView;
         private bool _isVisible;
 
-        public NetView(ref NetworkController networkController) : base("Network Information") {
+        public NetView(ref NetworkController nc) : base("Network Information") {
             X = 1;
             Y = 2;
-            Width = Dim.Fill() - 2;
+            Width = Dim.Percent(66)-1;
             Height = Dim.Fill() - 2;
             ColorScheme = Constants.TLSColorScheme;
 
@@ -28,7 +28,7 @@ namespace TLScope.src.Views {
                 Width = Dim.Fill() - 2,
                 Height = Dim.Fill() - 2,
                 CanFocus = true,
-                TreeBuilder = new DeviceTreeBuilder(ref networkController.GetActiveDevices())
+                TreeBuilder = new DeviceTreeBuilder(ref nc.GetActiveDevices())
             };
 
             Add(_deviceTreeView);

@@ -13,6 +13,10 @@ namespace TLScope.src.Utilities {
         public const string GoodbyeMessage = "Thank you for using TLScope!";
         public const string RepositoryUrl = "https://github.com/DangSage/TLScope";
 
+        public const string AboutMessage =
+            "TLScope is a network visualization/monitoring tool that allows you to view active devices on your local network. "+
+            "It is written in C# using the Terminal.Gui library. Look for updates and contribute on GitHub!";
+
         public static readonly ColorScheme TLSColorScheme = new() {
             Normal = new Terminal.Gui.Attribute(Color.White, Color.Black),
             Focus = new Terminal.Gui.Attribute(Color.White, Color.DarkGray),

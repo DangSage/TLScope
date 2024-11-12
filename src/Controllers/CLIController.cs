@@ -39,7 +39,6 @@ namespace TLScope.src.Controllers {
                         Console.WriteLine("Unknown option: " + _args[0]);
                         break;
                 }
-                System.Environment.Exit(0);
             } else {
                 if (!RunInteractiveMode()) {
                     System.Environment.Exit(1);

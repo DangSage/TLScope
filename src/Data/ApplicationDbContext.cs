@@ -25,6 +25,12 @@ namespace TLScope.src.Data {
         protected override void OnModelCreating(ModelBuilder modelBuilder) {
             base.OnModelCreating(modelBuilder);
 
+            //Ignore device properties from the TreeNode base class
+            modelBuilder.Entity<Device>()
+                .Ignore(d => d.Children)
+                .Ignore(d => d.Text)
+                .Ignore(d => d.Tag);
+
             // Configure entity relationships and constraints
             modelBuilder.Entity<User>()
                 .HasMany(u => u.Devices)

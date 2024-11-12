@@ -6,8 +6,6 @@ using TLScope.src.Debugging;
 
 namespace TLScope.src.Services {
     public class NetworkService {
-        private const int MaxParallelism = 3; // Limit the number of parallel tasks
-
         public static async Task ScanNetworkAsync(ConcurrentDictionary<string, Device> activeDevices,
             CancellationToken cancellationToken = default) {
             Logging.Write("Starting network scan...");
@@ -20,7 +18,7 @@ namespace TLScope.src.Services {
                         continue;
                     }
 
-                    var list = NetData.ARPCommand(10);
+                    var list = NetData.ARPCommand(5);
                     for (int i = 0; i < list.Count; i++) {
                         (string IP, string MACAddress) _dev = list[i];
                         if (cancellationToken.IsCancellationRequested) {
@@ -40,6 +38,7 @@ namespace TLScope.src.Services {
                                     return existingDevice;
                                 }
                             );
+                            DeviceListUpdate(null, EventArgs.Empty); // Notify subscribers of the change
                             Logging.Write($"Added {_dev.IP} to activeDevices list. Total: {activeDevices.Count}");
                         }
                     }
@@ -70,6 +69,12 @@ namespace TLScope.src.Services {
                                         Logging.Write($"TIMEOUT: {ip} is inactive. Removed from activeDevices list.");
                                     }
                                 }
+
+                                // Update the LastSeen property of the device
+                                if (activeDevices.TryGetValue(ip, out Device? device)) {
+                                    device.LastSeen = DateTime.UtcNow;
+                                }
+                                DeviceListUpdate(null, EventArgs.Empty); // Notify subscribers of the change
                             } catch (PingException ex) {
                                 Logging.Write($"Ping failed for {ip}: {ex.Message}");
                             } catch (Exception ex) {
@@ -85,5 +90,8 @@ namespace TLScope.src.Services {
                 Logging.Write("Device pinging stopped.");
             }
         }
+
+        // DeviceListUpdate event to notify subscribers of changes to the activeDevices list
+        public static event EventHandler DeviceListUpdate = delegate { };
     }
 }

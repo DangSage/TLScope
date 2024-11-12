@@ -1,85 +1,91 @@
-// Window class to display network information, including active devices and their information
-
 using System.Collections.Concurrent;
-
+using System.Linq;
 using Terminal.Gui;
+using Terminal.Gui.Trees;
 
-using TLScope.src.Controllers;
 using TLScope.src.Utilities;
-using TLScope.src.Debugging;
+using TLScope.src.Services;
+using TLScope.src.Controllers;
 using TLScope.src.Models;
-
 
 namespace TLScope.src.Views {
     public class NetView : Window {
         private readonly TreeView _deviceTreeView;
-        private bool _isVisible;
+        private readonly ConcurrentDictionary<string, Device> _devices;
+        private readonly TreeNode _rootNode = new("Listening for Devices...");
 
         public NetView(ref NetworkController nc) : base("Network Information") {
-            X = 1;
-            Y = 2;
-            Width = Dim.Percent(66)-1;
-            Height = Dim.Fill() - 2;
+            _devices = nc.GetActiveDevices();
             ColorScheme = Constants.TLSColorScheme;
 
             _deviceTreeView = new TreeView {
                 X = 0,
-                Y = 2,
+                Y = 0,
                 Width = Dim.Fill() - 2,
                 Height = Dim.Fill() - 2,
                 CanFocus = true,
-                TreeBuilder = new DeviceTreeBuilder(ref nc.GetActiveDevices())
             };
 
             Add(_deviceTreeView);
+            _deviceTreeView.AddObject(_rootNode);
 
-            // Event handlers for visibility
-            VisibleChanged += OnVisibleChanged;
+            NetworkService.DeviceListUpdate += (sender, e) => PopulateTreeView();
         }
 
-        private void OnVisibleChanged(bool isVisible, ref NetworkController nc) {
-            _isVisible = isVisible;
-            if (_isVisible) {
-                UpdateView(ref nc);
-            }
-        }
-
-        private void OnDevicesUpdated(ConcurrentDictionary<string, Device> devices) {
-            if (_isVisible) {
-                Application.MainLoop.Invoke(() => {
-                    _deviceTreeView.TreeBuilder = new DeviceTreeBuilder(ref devices);
-                    _deviceTreeView.SetNeedsDisplay();
-                    Logging.Write($"Device list updated: {devices.Count} devices.");
-                    LogTreeViewContent();
-                });
-            }
-        }
-
-        public void UpdateView(ref NetworkController nc) {
-            try {
-                if (_isVisible) {
-                    _deviceTreeView.TreeBuilder = new DeviceTreeBuilder(ref nc.GetActiveDevices());
-                    _deviceTreeView.SetNeedsDisplay();
-                    Logging.Write($"Device list updated: {nc.GetActiveDevices().Count} devices.");
-                    LogTreeViewContent();
+        private void PopulateTreeView() {
+            // Update root node text
+            _rootNode.Text = $"Number of Devices: {_devices.Count}";
+        
+            // Create a dictionary to map device IP addresses to tree nodes
+            var nodeMap = new Dictionary<string, TreeNode>();
+            foreach (var node in _rootNode.Children.OfType<TreeNode>()) {
+                if (node.Tag is Device device) {
+                    nodeMap[device.IPAddress] = node;
                 }
-            } catch (Exception ex) {
-                Logging.Error("An error occurred while updating the view.", ex);
             }
-        }
-
-        private void LogTreeViewContent() {
-            var rootChildren = _deviceTreeView.TreeBuilder.GetChildren(null);
-            if (!rootChildren.Any()) {
-                Logging.Write("TreeView Root: No devices found.");
-                return;
+        
+            // Create a hash set of the device values
+            var devices = new HashSet<Device>(_devices.Values);
+        
+            // Stack to manage tree nodes
+            var nodeStack = new Stack<TreeNode>();
+        
+            // Compare the existing tree nodes with the devices
+            foreach (var device in devices) {
+                if (device == null) { continue; }
+        
+                if (nodeMap.TryGetValue(device.IPAddress, out var node)) {
+                    // Update the existing node in the tree
+                    node.Tag = device;
+                    node.Children.Clear();
+                    node.Children.Add(new TreeNode($"IP Address: {device.IPAddress}"));
+                    node.Children.Add(new TreeNode($"MAC Address: {device.MACAddress}"));
+                    node.Children.Add(new TreeNode($"Operating System: {device.OperatingSystem ?? "Unknown"}"));
+                    node.Children.Add(new TreeNode($"Last Seen: {device.LastSeen}"));
+                } else {
+                    // Add new node for the device
+                    var newNode = new TreeNode(device.DeviceName) { Tag = device };
+                    newNode.Children.Add(new TreeNode($"IP Address: {device.IPAddress}"));
+                    newNode.Children.Add(new TreeNode($"MAC Address: {device.MACAddress}"));
+                    newNode.Children.Add(new TreeNode($"Operating System: {device.OperatingSystem ?? "Unknown"}"));
+                    newNode.Children.Add(new TreeNode($"Last Seen: {device.LastSeen}"));
+        
+                    _rootNode.Children.Add(newNode);
+                    nodeStack.Push(newNode);
+                }
             }
-
-            var root = rootChildren.First();
-            Logging.Write($"TreeView Root: {root.Text}");
-            foreach (var child in _deviceTreeView.TreeBuilder.GetChildren(root)) {
-                Logging.Write($"TreeView Child: {child.Text}");
+        
+            // Remove nodes that are no longer in the devices list
+            foreach (var node in _rootNode.Children.OfType<TreeNode>().ToList()) {
+                if (node.Tag is Device device && !devices.Contains(device)) {
+                    _rootNode.Children.Remove(node);
+                }
             }
+        
+            // Refresh the TreeView
+            _deviceTreeView.ClearObjects();
+            _deviceTreeView.AddObject(_rootNode);
+            _deviceTreeView.ExpandAll();
         }
     }
 }

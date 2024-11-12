@@ -4,6 +4,8 @@ using System.Reflection;
 using System.Text;
 using System.Diagnostics;
 
+using Terminal.Gui.Trees;
+
 using TLScope.src.Debugging;
 
 namespace TLScope.src.Utilities {

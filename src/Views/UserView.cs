@@ -1,12 +1,9 @@
 // Window class to display data on the client's user, including network information
 
-using System.Net.NetworkInformation;
-
 using Terminal.Gui;
 using Terminal.Gui.Trees;
 
 using TLScope.src.Controllers;
-using TLScope.src.Models;
 using TLScope.src.Utilities;
 
 namespace TLScope.src.Views {
@@ -14,12 +11,8 @@ namespace TLScope.src.Views {
 
         private readonly TreeView _userTreeView;
 
-        public UserView(NetworkInterface ni) : base("Client Information") {
-            // take up half of the screen
-            X = Pos.Percent(66)+1;
-            Y = 2;
-            Width = Dim.Percent(33) - 3;
-            Height = Dim.Percent(50) - 3;
+        public UserView(ref NetworkController nc) : base("Client Information") {
+            var ni = nc._networkInterface ?? throw new InvalidOperationException("Network interface is null");
             CanFocus = false;
             ColorScheme = Constants.TLSColorScheme;
 
@@ -31,15 +24,15 @@ namespace TLScope.src.Views {
                 CanFocus = false,
             };
 
-            var root = new TreeNode("This Device");
+            var root = new TreeNode($"This Device ({System.Environment.MachineName})");
             var interfaceNode = new TreeNode($"Operational Status: {ni.OperationalStatus}") {
                 Children = {
-                    new TreeNode($"Interface Name:        {ni.Name}"),
-                    new TreeNode($"Interface Type:        {ni.NetworkInterfaceType}"),
-                    new TreeNode($"MAC Address:           {ni.GetPhysicalAddress()}"),
-                    new TreeNode($"IPv4 Statistics:       {ni.GetIPv4Statistics()}"),
-                    new TreeNode($"Speed:                 {ni.Speed}"),
-                    new TreeNode($"Supports Multicast:    {ni.SupportsMulticast}")
+                    new TreeNode($"Interface Name:.....{ni.Name}"),
+                    new TreeNode($"Interface Type:.....{ni.NetworkInterfaceType}"),
+                    new TreeNode($"MAC Address:........{ni.GetPhysicalAddress()}"),
+                    new TreeNode($"IPv4:...............{NetData.GetLocalIPAddress(ni)}"),   
+                    new TreeNode($"Speed:..............{ni.Speed}"),
+                    new TreeNode($"Multicast Support:..{ni.SupportsMulticast}")
                 }
             };
 

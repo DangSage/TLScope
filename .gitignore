@@ -34,3 +34,12 @@ bld/
 *.dbproj.user
 *db-shm
 *db-wal
+
+# TLScope output files
+*.dot
+*.bak
+tlscope_exclusions.json
+appsettings.json
+
+# Claude Code session logs
+*-change-*.txt

@@ -41,5 +41,3 @@ bld/
 tlscope_exclusions.json
 appsettings.json
 
-# Claude Code session logs
-*-change-*.txt

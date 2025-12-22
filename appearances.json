@@ -1,0 +1,12 @@
+[
+    {
+        "appearance": [
+            "       ",
+            "  ───  ",
+            "(     )",
+            " >   < "
+        ],
+        "name": "emptyexample",
+        "enum": "APPEARANCE_EXAMPLE"
+    }
+]

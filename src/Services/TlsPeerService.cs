@@ -51,7 +51,7 @@ public class TlsPeerService : ITlsPeerService
     // TLS configuration
     private const string TLS_SERVER_NAME = "tlscope";
     private const string CERT_FILE_PATH = "tlscope.pfx";
-    private const string CERT_PASSWORD = "password"; // TODO: Move to secure config
+    private static readonly string CERT_PASSWORD = GetCertificatePassword();
 
     private readonly User _localUser;
     private readonly List<TLSPeer> _discoveredPeers = new();
@@ -72,6 +72,23 @@ public class TlsPeerService : ITlsPeerService
     public TlsPeerService(User localUser)
     {
         _localUser = localUser;
+    }
+
+    /// <summary>
+    /// Get certificate password from environment variable or fallback to default
+    /// </summary>
+    private static string GetCertificatePassword()
+    {
+        var password = Environment.GetEnvironmentVariable("TLSCOPE_CERT_PASSWORD");
+
+        if (string.IsNullOrEmpty(password))
+        {
+            Log.Warning("TLSCOPE_CERT_PASSWORD environment variable not set. Using default password. " +
+                       "For production use, set the environment variable to secure your certificate.");
+            return "password"; // Development fallback
+        }
+
+        return password;
     }
 
     /// <summary>

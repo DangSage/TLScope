@@ -28,6 +28,25 @@ public class GraphService : IGraphService
     }
 
     /// <summary>
+    /// Execute an async task in a fire-and-forget manner with proper error handling
+    /// </summary>
+    private static void FireAndForget(Task task)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await task.ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // Log unhandled exceptions from fire-and-forget tasks
+                Log.Error(ex, "Unhandled exception in fire-and-forget task");
+            }
+        });
+    }
+
+    /// <summary>
     /// Add device to the graph
     /// </summary>
     public void AddDevice(Device device)
@@ -52,7 +71,7 @@ public class GraphService : IGraphService
         }
 
         // Save to database
-        _ = SaveDeviceToDatabaseAsync(device);
+        FireAndForget(SaveDeviceToDatabaseAsync(device));
 
         Log.Information($"Added device to graph: {device}");
         DeviceAdded?.Invoke(this, device);
@@ -118,7 +137,7 @@ public class GraphService : IGraphService
             }
 
             // Save to database
-            _ = SaveDeviceToDatabaseAsync(existing);
+            FireAndForget(SaveDeviceToDatabaseAsync(existing));
 
             Log.Debug($"Updated device: {existing}");
         }
@@ -328,7 +347,7 @@ public class GraphService : IGraphService
                 }
 
                 // Remove from database
-                _ = DeleteDeviceFromDatabaseAsync(device);
+                FireAndForget(DeleteDeviceFromDatabaseAsync(device));
 
                 Log.Debug($"[CLEANUP] Removed device: {device.IPAddress} ({device.MACAddress}), last seen {device.LastSeen:yyyy-MM-dd HH:mm:ss}");
             }

@@ -16,8 +16,6 @@ namespace TLScope.Services;
 public class PacketCaptureService : IPacketCaptureService
 {
     private ILiveDevice? _captureDevice;
-    private readonly ConcurrentDictionary<string, Device> _discoveredDevices = new();
-    private readonly ConcurrentDictionary<string, Connection> _activeConnections = new();
     private bool _isCapturing;
     private bool _captureReady; // Only fire device discovery events after capture is confirmed ready
     private string? _currentInterfaceName;
@@ -152,8 +150,8 @@ public class PacketCaptureService : IPacketCaptureService
             return;
 
         var deviceName = _captureDevice.Name;
-        var deviceCount = _discoveredDevices.Count;
-        var connectionCount = _activeConnections.Count;
+        var deviceCount = _graphService.GetAllDevices().Count;
+        var connectionCount = _graphService.GetAllConnections().Count;
 
         _captureReady = false;
         _captureDevice.StopCapture();
@@ -517,7 +515,10 @@ public class PacketCaptureService : IPacketCaptureService
             }
         }
 
-        if (_discoveredDevices.TryGetValue(key, out var device))
+        // Check if device already exists in GraphService
+        var device = _graphService.GetDevice(key);
+
+        if (device != null)
         {
             // Update existing device
             device.IPAddress = ipAddress;
@@ -525,35 +526,14 @@ public class PacketCaptureService : IPacketCaptureService
             device.PacketCount++;
             device.BytesTransferred += bytes;
 
-            // Update device in graph service to keep LastSeen timestamp in sync
+            // Update device in graph service
             _graphService.UpdateDevice(device);
 
             Log.Debug($"[DEVICE-UPDATE] Updated existing device: MAC={macAddress}, IP={ipAddress}, PacketCount={device.PacketCount}, Bytes={device.BytesTransferred}");
             return device;
         }
 
-        // Check if device already exists in graph service (loaded from DB)
-        var deviceFromGraph = _graphService.GetDevice(key);
-        if (deviceFromGraph != null)
-        {
-            // Use the existing device from graph service
-            device = deviceFromGraph;
-            device.IPAddress = ipAddress;
-            device.LastSeen = DateTime.UtcNow;
-            device.PacketCount++;
-            device.BytesTransferred += bytes;
-
-            // Add to local cache
-            _discoveredDevices[key] = device;
-
-            // Update in graph service
-            _graphService.UpdateDevice(device);
-
-            Log.Debug($"[DEVICE-RESUME] Resumed tracking device from database: MAC={macAddress}, IP={ipAddress}");
-            return device;
-        }
-
-        // New device discovered
+        // New device discovered - create and add to GraphService
         device = new Device
         {
             MACAddress = macAddress,
@@ -569,8 +549,6 @@ public class PacketCaptureService : IPacketCaptureService
 
         // Perform DNS hostname resolution asynchronously (fire-and-forget)
         _ = ResolveHostnameAsync(device);
-
-        _discoveredDevices[key] = device;
 
         // Only fire device discovery event if capture is ready
         if (_captureReady)
@@ -619,7 +597,10 @@ public class PacketCaptureService : IPacketCaptureService
             return null;
         }
 
-        if (_discoveredDevices.TryGetValue(key, out var device))
+        // Check if device already exists in GraphService
+        var device = _graphService.GetDevice(key);
+
+        if (device != null)
         {
             // Update existing virtual device
             device.LastSeen = DateTime.UtcNow;
@@ -633,26 +614,7 @@ public class PacketCaptureService : IPacketCaptureService
             return device;
         }
 
-        // Check if device already exists in graph service (loaded from DB)
-        var deviceFromGraph = _graphService.GetDevice(key);
-        if (deviceFromGraph != null)
-        {
-            device = deviceFromGraph;
-            device.LastSeen = DateTime.UtcNow;
-            device.PacketCount++;
-            device.BytesTransferred += bytes;
-
-            // Add to local cache
-            _discoveredDevices[key] = device;
-
-            // Update in graph service
-            _graphService.UpdateDevice(device);
-
-            Log.Debug($"[VIRTUAL-DEVICE-RESUME] Resumed virtual device from database: IP={ipAddress}");
-            return device;
-        }
-
-        // New virtual device discovered
+        // New virtual device discovered - create and fire event
         device = new Device
         {
             MACAddress = key, // Use virtual key as MAC for unique identification
@@ -667,8 +629,6 @@ public class PacketCaptureService : IPacketCaptureService
         // Perform DNS hostname resolution asynchronously
         _ = ResolveHostnameAsync(device);
 
-        _discoveredDevices[key] = device;
-
         // Fire device discovery event
         if (_captureReady)
         {
@@ -680,72 +640,52 @@ public class PacketCaptureService : IPacketCaptureService
     }
 
     /// <summary>
-    /// Track connection between devices
+    /// Track connection between devices (delegates to GraphService)
     /// </summary>
     private void TrackConnection(Device src, Device dst, string protocol,
         int srcPort, int dstPort, int bytes, int ttl)
     {
-        var key = $"{src.MACAddress}:{srcPort}→{dst.MACAddress}:{dstPort}:{protocol}";
-
-        if (_activeConnections.TryGetValue(key, out var connection))
+        // Create connection object
+        var connection = new Connection
         {
-            // Update existing connection
-            connection.LastSeen = DateTime.UtcNow;
-            connection.PacketCount++;
-            connection.RecentPacketCount++;
-            connection.BytesTransferred += bytes;
+            SourceDevice = src,
+            DestinationDevice = dst,
+            Protocol = protocol,
+            SourcePort = srcPort,
+            DestinationPort = dstPort,
+            FirstSeen = DateTime.UtcNow,
+            LastSeen = DateTime.UtcNow,
+            PacketCount = 1,
+            BytesTransferred = bytes,
+            MinTTL = ttl,
+            MaxTTL = ttl,
+            AverageTTL = ttl,
+            PacketCountForTTL = 1
+        };
 
-            // Update TTL statistics
-            UpdateTTLStatistics(connection, ttl);
-
-            Log.Debug($"[CONNECTION-UPDATE] {protocol} connection updated: {src.IPAddress}:{srcPort} → {dst.IPAddress}:{dstPort}, Packets={connection.PacketCount}, Bytes={connection.BytesTransferred}, TTL={ttl}");
+        // Check if this is a TLS peer connection (port 8443)
+        if (dstPort == 8443 || srcPort == 8443)
+        {
+            connection.IsTLSPeerConnection = true;
+            connection.Type = ConnectionType.TLSPeer;
+            Log.Information($"[TLSCOPE-PEER] TLS peer connection detected: {src.IPAddress}:{srcPort} → {dst.IPAddress}:{dstPort}");
         }
         else
         {
-            // New connection
-            connection = new Connection
-            {
-                SourceDevice = src,
-                DestinationDevice = dst,
-                Protocol = protocol,
-                SourcePort = srcPort,
-                DestinationPort = dstPort,
-                FirstSeen = DateTime.UtcNow,
-                LastSeen = DateTime.UtcNow,
-                PacketCount = 1,
-                BytesTransferred = bytes,
-                MinTTL = ttl,
-                MaxTTL = ttl,
-                AverageTTL = ttl,
-                PacketCountForTTL = 1
-            };
+            // Classify connection type based on TTL and destination
+            connection.Type = ClassifyConnectionType(dst, ttl);
+        }
 
-            // Check if this is a TLS peer connection (port 8443)
-            if (dstPort == 8443 || srcPort == 8443)
-            {
-                connection.IsTLSPeerConnection = true;
-                connection.Type = ConnectionType.TLSPeer;
-                Log.Information($"[TLSCOPE-PEER] TLS peer connection detected: {src.IPAddress}:{srcPort} → {dst.IPAddress}:{dstPort}");
-            }
-            else
-            {
-                // Classify connection type based on TTL and destination
-                connection.Type = ClassifyConnectionType(dst, ttl);
-            }
+        Log.Debug($"[CONNECTION-TRACK] {protocol} connection: {src.IPAddress}:{srcPort} → {dst.IPAddress}:{dstPort}, Type={connection.Type}, TTL={ttl}, Bytes={bytes}");
 
-            _activeConnections[key] = connection;
-
-            Log.Information($"[CONNECTION-NEW] New {protocol} connection: {src.IPAddress}:{srcPort} → {dst.IPAddress}:{dstPort}, Type={connection.Type}, TTL={ttl}, Bytes={bytes}");
-
-            // Only fire connection event if capture is ready
-            if (_captureReady)
-            {
-                ConnectionDetected?.Invoke(this, connection);
-            }
-            else
-            {
-                Log.Debug($"[CONNECTION-NEW] Connection detected (capture not ready yet): {src.IPAddress}:{srcPort} → {dst.IPAddress}:{dstPort}");
-            }
+        // Fire connection event if capture is ready (GraphService will be updated via MainApplication event handler)
+        if (_captureReady)
+        {
+            ConnectionDetected?.Invoke(this, connection);
+        }
+        else
+        {
+            Log.Debug($"[CONNECTION-NEW] Connection detected (capture not ready yet): {src.IPAddress}:{srcPort} → {dst.IPAddress}:{dstPort}");
         }
 
         // Track open ports
@@ -753,43 +693,6 @@ public class PacketCaptureService : IPacketCaptureService
         {
             dst.OpenPorts.Add(dstPort);
             Log.Debug($"[PORT-DISCOVERY] New open port detected on {dst.IPAddress}: {dstPort} ({protocol})");
-        }
-    }
-
-    /// <summary>
-    /// Update TTL statistics for a connection
-    /// Uses sliding window average for last 100 packets
-    /// </summary>
-    private void UpdateTTLStatistics(Connection connection, int ttl)
-    {
-        connection.PacketCountForTTL++;
-
-        // Update min/max
-        connection.MinTTL = connection.MinTTL.HasValue ? Math.Min(connection.MinTTL.Value, ttl) : ttl;
-        connection.MaxTTL = connection.MaxTTL.HasValue ? Math.Max(connection.MaxTTL.Value, ttl) : ttl;
-
-        // Update average (weighted to recent packets)
-        if (connection.AverageTTL.HasValue)
-        {
-            // Sliding window average - more weight to recent packets
-            // Use last 100 packets for averaging
-            var weight = Math.Min(connection.PacketCountForTTL, 100);
-            connection.AverageTTL = (int)((connection.AverageTTL.Value * (weight - 1) + ttl) / weight);
-        }
-        else
-        {
-            connection.AverageTTL = ttl;
-        }
-
-        // Re-classify connection type if not a TLS peer connection
-        if (!connection.IsTLSPeerConnection && connection.AverageTTL.HasValue)
-        {
-            var newType = ClassifyConnectionType(connection.DestinationDevice, connection.AverageTTL.Value);
-            if (newType != connection.Type)
-            {
-                Log.Debug($"[CONNECTION-RECLASSIFY] Connection {connection.SourceDevice.IPAddress} → {connection.DestinationDevice.IPAddress} reclassified from {connection.Type} to {newType} (AvgTTL={connection.AverageTTL})");
-                connection.Type = newType;
-            }
         }
     }
 
@@ -909,46 +812,32 @@ public class PacketCaptureService : IPacketCaptureService
     }
 
     /// <summary>
-    /// Get all discovered devices
+    /// Get all discovered devices (delegates to GraphService)
     /// </summary>
     public List<Device> GetDiscoveredDevices()
     {
-        return _discoveredDevices.Values.ToList();
+        return _graphService.GetAllDevices();
     }
 
     /// <summary>
-    /// Get all active connections
+    /// Get all active connections (delegates to GraphService)
     /// </summary>
     public List<Connection> GetActiveConnections()
     {
-        return _activeConnections.Values
+        return _graphService.GetAllConnections()
             .Where(c => c.IsActive)
             .ToList();
     }
 
     /// <summary>
-    /// Clear old inactive connections (older than 5 minutes)
+    /// Clear old inactive connections (delegates to GraphService for device cleanup)
+    /// Connections are now managed entirely by GraphService
     /// </summary>
     public void CleanupOldConnections()
     {
-        var cutoff = DateTime.UtcNow.AddMinutes(-5);
-        var toRemove = _activeConnections
-            .Where(kvp => kvp.Value.LastSeen < cutoff)
-            .ToList();
-
-        if (toRemove.Count > 0)
-        {
-            Log.Information($"[CLEANUP] Starting cleanup of {toRemove.Count} old connections (inactive since {cutoff:yyyy-MM-dd HH:mm:ss})");
-
-            foreach (var kvp in toRemove)
-            {
-                var conn = kvp.Value;
-                Log.Debug($"[CLEANUP] Removing connection: {conn.SourceDevice.IPAddress}:{conn.SourcePort} → {conn.DestinationDevice.IPAddress}:{conn.DestinationPort} ({conn.Protocol}), Last seen: {conn.LastSeen:yyyy-MM-dd HH:mm:ss}");
-                _activeConnections.TryRemove(kvp.Key, out _);
-            }
-
-            Log.Information($"[CLEANUP] Cleaned up {toRemove.Count} old connections. Remaining: {_activeConnections.Count}");
-        }
+        // Device cleanup handles removing old connections since connections
+        // are stored as edges in the graph
+        _graphService.CleanupInactiveDevices();
     }
 
     /// <summary>
@@ -1079,9 +968,7 @@ public class PacketCaptureService : IPacketCaptureService
             // Try to resolve hostname
             _ = Task.Run(() => ResolveHostnameAsync(device));
 
-            _discoveredDevices.TryAdd(device.MACAddress, device);
-            _graphService.AddDevice(device);
-
+            // GraphService is updated via DeviceDiscovered event handler in MainApplication
             Log.Information($"[NETWORK-SCAN] Discovered new device via scan: {e.ipAddress}");
             DeviceDiscovered?.Invoke(this, device);
         }

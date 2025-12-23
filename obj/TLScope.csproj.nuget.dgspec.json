@@ -10,11 +10,11 @@
         "projectUniqueName": "/home/khai/Documents/Repos/TLScope/TLScope.csproj",
         "projectName": "TLScope",
         "projectPath": "/home/khai/Documents/Repos/TLScope/TLScope.csproj",
-        "packagesPath": "/home/khai/.nuget/packages/",
+        "packagesPath": "/root/.nuget/packages/",
         "outputPath": "/home/khai/Documents/Repos/TLScope/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/home/khai/.nuget/NuGet/NuGet.Config"
+          "/root/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net9.0"

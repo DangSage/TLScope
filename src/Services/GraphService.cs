@@ -2,6 +2,7 @@ using QuikGraph;
 using QuikGraph.Algorithms;
 using TLScope.Models;
 using TLScope.Data;
+using TLScope.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -742,19 +743,6 @@ public class NetworkStatistics
     {
         return $"Devices: {ActiveDevices}/{TotalDevices} | " +
                $"Connections: {ActiveConnections}/{TotalConnections} | " +
-               $"Bytes: {FormatBytes(TotalBytesTransferred)}";
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        double len = bytes;
-        int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-        return $"{len:0.##} {sizes[order]}";
+               $"Bytes: {LatexHelpers.FormatBytes(TotalBytesTransferred)}";
     }
 }

@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/home/khai/Documents/TLScope/TLScope.csproj": {}
+    "/home/khai/Documents/Repos/TLScope/TLScope.csproj": {}
   },
   "projects": {
-    "/home/khai/Documents/TLScope/TLScope.csproj": {
+    "/home/khai/Documents/Repos/TLScope/TLScope.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/khai/Documents/TLScope/TLScope.csproj",
+        "projectUniqueName": "/home/khai/Documents/Repos/TLScope/TLScope.csproj",
         "projectName": "TLScope",
-        "projectPath": "/home/khai/Documents/TLScope/TLScope.csproj",
-        "packagesPath": "/root/.nuget/packages/",
-        "outputPath": "/home/khai/Documents/TLScope/obj/",
+        "projectPath": "/home/khai/Documents/Repos/TLScope/TLScope.csproj",
+        "packagesPath": "/home/khai/.nuget/packages/",
+        "outputPath": "/home/khai/Documents/Repos/TLScope/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/root/.nuget/NuGet/NuGet.Config"
+          "/home/khai/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net9.0"
@@ -38,7 +38,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "9.0.100"
+        "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
         "net9.0": {
@@ -105,7 +105,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[9.0.9, 9.0.9]"
+              "version": "[9.0.11, 9.0.11]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.linux-x64",
+              "version": "[9.0.11, 9.0.11]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[9.0.11, 9.0.11]"
             }
           ],
           "frameworkReferences": {
@@ -113,7 +121,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/9.0.110/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.100/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

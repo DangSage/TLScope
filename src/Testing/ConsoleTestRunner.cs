@@ -1,6 +1,7 @@
 using TLScope.Models;
 using TLScope.Services;
 using TLScope.Services.Mock;
+using TLScope.Utilities;
 using Serilog;
 
 namespace TLScope.Testing;
@@ -169,7 +170,7 @@ public class ConsoleTestRunner
         Console.WriteLine($"   Devices: {stats.ActiveDevices}/{stats.TotalDevices} active");
         Console.WriteLine($"   Connections: {stats.ActiveConnections}/{stats.TotalConnections} active");
         Console.WriteLine($"   Peers: {connectedPeers}/{peers.Count} connected");
-        Console.WriteLine($"   Data: {FormatBytes(stats.TotalBytesTransferred)} transferred");
+        Console.WriteLine($"   Data: {LatexHelpers.FormatBytes(stats.TotalBytesTransferred)} transferred");
     }
 
     private void OnDeviceDiscovered(object? sender, Device device)
@@ -216,18 +217,5 @@ public class ConsoleTestRunner
         _peerService.Dispose();
         _cancellation.Dispose();
         Console.WriteLine("✅ Cleanup complete");
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        double len = bytes;
-        int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len /= 1024;
-        }
-        return $"{len:0.##} {sizes[order]}";
     }
 }

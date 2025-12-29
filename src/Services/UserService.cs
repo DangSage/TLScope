@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TLScope.Data;
 using TLScope.Models;
-using TLScope.Utilities;
 using Serilog;
 
 namespace TLScope.Services;
@@ -35,7 +34,6 @@ public class UserService
             if (string.IsNullOrEmpty(user.SSHPublicKey) || user.SSHPublicKey.StartsWith("default-"))
             {
                 user.SSHPublicKey = GenerateTemporarySSHKey(username);
-                user.AvatarColor = AvatarUtility.GenerateColorFromSSHKey(user.SSHPublicKey);
                 Log.Information($"Generated temporary SSH key for existing user: {username}");
             }
 
@@ -50,7 +48,6 @@ public class UserService
             Username = username,
             Email = email ?? $"{username}@localhost",
             SSHPrivateKeyPath = sshKeyPath,
-            AvatarType = "APPEARANCE_DEFAULT",
             CreatedAt = DateTime.UtcNow,
             LastLogin = DateTime.UtcNow
         };
@@ -61,7 +58,6 @@ public class UserService
             try
             {
                 user.SSHPublicKey = await File.ReadAllTextAsync(sshKeyPath + ".pub");
-                user.AvatarColor = AvatarUtility.GenerateColorFromSSHKey(user.SSHPublicKey);
             }
             catch (Exception ex)
             {
@@ -70,10 +66,8 @@ public class UserService
         }
         else
         {
-            // Generate a temporary session SSH key fingerprint for unique color
-            // This changes each session unless user defines a real SSH key
+            // Generate a temporary session SSH key fingerprint for SSH randomart
             user.SSHPublicKey = GenerateTemporarySSHKey(username);
-            user.AvatarColor = AvatarUtility.GenerateColorFromSSHKey(user.SSHPublicKey);
             Log.Information($"Generated temporary SSH key for session: {username}");
         }
 
@@ -112,56 +106,7 @@ public class UserService
     }
 
     /// <summary>
-    /// Save custom avatar lines for a user
-    /// </summary>
-    public async Task SaveCustomAvatar(User user, string[] lines)
-    {
-        if (lines.Length != 4)
-        {
-            throw new ArgumentException("Avatar must have exactly 4 lines", nameof(lines));
-        }
-
-        user.CustomAvatarLines = lines;
-
-        await UpdateUser(user);
-        Log.Information($"Custom avatar saved for user {user.Username}");
-    }
-
-    /// <summary>
-    /// Get avatar lines for a user (custom or predefined)
-    /// </summary>
-    public string[] GetUserAvatar(User user)
-    {
-        // Check if user has custom avatar lines
-        if (user.CustomAvatarLines != null && user.CustomAvatarLines.Length == 4)
-        {
-            return user.CustomAvatarLines;
-        }
-
-        // Fall back to predefined avatar
-        var avatar = AvatarUtility.GetAvatar(user.AvatarType);
-        return avatar?.Appearance ?? new[]
-        {
-            "   o   ",
-            "./\\|/\\.",
-            "( o.o )",
-            " > ^ < "
-        };
-    }
-
-    /// <summary>
-    /// Clear custom avatar lines and revert to predefined avatar
-    /// </summary>
-    public async Task ClearCustomAvatar(User user)
-    {
-        user.CustomAvatarLines = null;
-
-        await UpdateUser(user);
-        Log.Information($"Custom avatar cleared for user {user.Username}");
-    }
-
-    /// <summary>
-    /// Generate a temporary SSH key fingerprint for session-based unique colors
+    /// Generate a temporary SSH key fingerprint for SSH randomart generation
     /// </summary>
     private string GenerateTemporarySSHKey(string username)
     {

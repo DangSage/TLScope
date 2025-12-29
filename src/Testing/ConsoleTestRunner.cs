@@ -28,9 +28,7 @@ public class ConsoleTestRunner
         {
             Username = "test-user",
             Email = "test@tlscope.local",
-            SSHPublicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... test@tlscope",
-            AvatarType = "ROBOT",
-            AvatarColor = "#4ECDC4"
+            SSHPublicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... test@tlscope"
         };
 
         _captureService = new MockPacketCaptureService();
@@ -193,7 +191,6 @@ public class ConsoleTestRunner
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss");
         Console.WriteLine($"[{timestamp}] 👥 Peer Discovered: {peer.Username} @ {peer.IPAddress}");
-        Console.WriteLine($"             Avatar: {peer.AvatarType} {peer.AvatarColor}");
     }
 
     private void OnPeerConnected(object? sender, TLSPeer peer)

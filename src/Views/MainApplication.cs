@@ -9,7 +9,151 @@ using Serilog;
 namespace TLScope.Views;
 
 /// <summary>
-/// Main Spectre.Console-based interactive application
+/// Main application orchestrator for TLScope network security visualization
+///
+/// ARCHITECTURE OVERVIEW:
+/// ======================
+///
+/// This application follows a view orchestration pattern where MainApplication acts as the central
+/// coordinator for specialized view components, services, and state management.
+///
+/// COMPONENT STRUCTURE:
+/// --------------------
+///
+/// Views (Specialized UI Components):
+/// - LoginView: User authentication and registration
+/// - StatisticsView: Network statistics dashboard and topology visualization
+/// - ConnectionsView: Connection tables, peer discovery, and connection details
+/// - ExportView: DOT graph and LaTeX/PDF report generation
+/// - DeviceListView: Device tables, interactive selection, and device details (integrated)
+/// - SettingsView: Network interface, exclusions, and filter configuration (integrated)
+///
+/// State Management:
+/// - UIStateManager: Centralized UI state with event-driven architecture
+///   * Filter state: FilteredDevice (Device?)
+///   * Highlight state: HighlightedDeviceMACs (HashSet<string>)
+///   * Exclusions: ExcludedIPs, ExcludedHostnames, ExcludedMACs (HashSet<string>)
+///   * Events: FilterStateChanged, ExclusionsChanged
+///   * Persistence: LoadExclusions(), SaveExclusions()
+///
+/// Utilities:
+/// - ViewHelpers: Shared formatting and rendering methods
+///   * Rendering: RenderViewHeader(), RenderToString()
+///   * Formatting: FormatBytes(), FormatRelativeTime(), FormatNumber(), FormatConnectionStrength()
+///   * Device helpers: GetDeviceName(), GetDeviceStatus(), GetDeviceTypeLabel(), GetDeviceIconAndColor()
+///   * Connection helpers: GetConnectionStatus()
+///
+/// Services (Dependency-Injected):
+/// - IGraphService: Device and connection data management (single source of truth)
+/// - IPacketCaptureService: Network packet capture and analysis
+/// - ITlsPeerService: TLS peer discovery and communication
+/// - UserService: User authentication and profile management
+/// - IGatewayDetectionService: Network gateway detection
+/// - FilterConfiguration: IP address filtering rules
+/// - DisplayConfiguration: UI layout and display settings
+///
+/// DESIGN PATTERNS:
+/// ----------------
+///
+/// 1. Event-Driven State Management:
+///    - UIStateManager publishes FilterStateChanged events
+///    - MainApplication subscribes to state changes
+///    - Dashboard refresh triggered automatically on state mutations
+///    - Eliminates manual refresh coordination and synchronization bugs
+///
+/// 2. Dependency Injection via Constructor:
+///    - Views receive services and delegates through constructor
+///    - Enables testability and loose coupling
+///    - No static dependencies or service locator pattern
+///
+/// 3. Delegate Pattern for Shared Functionality:
+///    - Complex methods passed as Func<> or Action<> delegates
+///    - Example: Func<List<Device>, List<Connection>, int> calculateVertexCut
+///    - Allows views to invoke MainApplication logic without tight coupling
+///
+/// 4. Single Source of Truth:
+///    - GraphService is authoritative source for device/connection data
+///    - UIStateManager is authoritative source for UI state
+///    - No duplicate caches or synchronized state
+///
+/// 5. View Orchestration:
+///    - MainApplication coordinates view lifecycle
+///    - Views are stateless (state lives in UIStateManager or services)
+///    - Views communicate through events/callbacks, not direct references
+///
+/// STATE FLOW:
+/// -----------
+///
+/// User Action → View Method → UIStateManager.SetState() → FilterStateChanged Event
+///                                                                    ↓
+/// MainApplication Event Handler ← _dashboardNeedsRefresh = true ←─────┘
+///                    ↓
+///            RenderDashboard() → Read from UIStateManager/Services → Display Updated UI
+///
+/// VIEW CONSTRUCTION PATTERN:
+/// --------------------------
+///
+/// Extracted Views (Constructor Injection):
+///   var view = new ExportView(
+///       _graphService,           // Service dependency
+///       _captureService,         // Service dependency
+///       _peerService,            // Service dependency
+///       _currentUser,            // Current session state
+///       _filterConfig,           // Configuration
+///       _uiState,                // UI state manager
+///       PromptSelection,         // Delegate to MainApplication method
+///       CalculateVertexCut,      // Delegate to MainApplication method
+///       GetMostConnectedDevice   // Delegate to MainApplication method
+///   );
+///   await view.ShowExportMenu();
+///
+/// Integrated Views (Direct Method Calls):
+///   - ShowDevicesTable() - Device list with filtering/highlighting
+///   - ManageExclusions() - Exclusion management
+///   - ShowIPFilterSettings() - IP filter configuration
+///
+/// INTEGRATION POINTS:
+/// -------------------
+///
+/// Dashboard Rendering:
+/// - Reads from UIStateManager.FilteredDevice to filter connections
+/// - Reads from UIStateManager.HighlightedDeviceMACs to highlight devices
+/// - Subscribes to UIStateManager.FilterStateChanged for automatic refresh
+///
+/// Event Handlers:
+/// - OnDeviceDiscovered: Validates against UIStateManager.IsExcluded()
+/// - OnConnectionDetected: Checks exclusions before processing
+/// - FilterStateChanged: Sets _dashboardNeedsRefresh flag
+///
+/// Shared Helper Access:
+/// - Views use ViewHelpers static methods directly
+/// - MainApplication retains specialized helpers (e.g., CalculateVertexCut)
+/// - No duplication of formatting logic
+///
+/// EXTENSIBILITY:
+/// --------------
+///
+/// To add a new view:
+/// 1. Create new view class in src/Views/
+/// 2. Accept required services and delegates via constructor
+/// 3. Use ViewHelpers for common formatting
+/// 4. Access state via UIStateManager (read-only or mutate with events)
+/// 5. Instantiate in MainApplication command handler
+/// 6. No changes to other views required (loose coupling)
+///
+/// To add new state:
+/// 1. Add property to UIStateManager
+/// 2. Create setter method that fires appropriate event
+/// 3. Subscribe to event in MainApplication constructor
+/// 4. Update dashboard rendering to use new state
+///
+/// THREAD SAFETY:
+/// --------------
+///
+/// - UIStateManager methods are not thread-safe (called from UI thread only)
+/// - _dashboardNeedsRefresh uses _refreshLock for thread-safe access
+/// - Event handlers from services use locks where necessary
+/// - Services (GraphService, CaptureService) handle their own thread safety
 /// </summary>
 public class MainApplication : IDisposable
 {
@@ -39,13 +183,8 @@ public class MainApplication : IDisposable
 
     private ConsoleStateManager? _consoleState;
 
-    private HashSet<string> _excludedIPs = new();
-    private HashSet<string> _excludedHostnames = new();
-    private HashSet<string> _excludedMACs = new();
-    private static readonly string ExclusionsConfigFile = ConfigurationHelper.GetConfigFilePath("exclusions.json");
-
-    private Device? _filteredDevice = null;
-    private HashSet<string> _highlightedDeviceMACs = new();
+    // UI State Manager (centralized filters, highlights, exclusions)
+    private readonly UIStateManager _uiState = new();
 
     public MainApplication(
         IPacketCaptureService captureService,
@@ -73,7 +212,16 @@ public class MainApplication : IDisposable
         _gatewayDetectionService.GatewayDetected += OnGatewayDetected;
         _gatewayDetectionService.LogMessage += OnLogMessage;
 
-        LoadExclusionsConfig();
+        // Subscribe to UI state changes for dashboard refresh
+        _uiState.FilterStateChanged += (s, e) =>
+        {
+            lock (_refreshLock)
+            {
+                _dashboardNeedsRefresh = true;
+            }
+        };
+
+        _uiState.LoadExclusions();
     }
 
     public async Task Run(string? networkInterface = null, User? user = null, bool startCapture = true, ConsoleStateManager? consoleState = null)
@@ -86,7 +234,8 @@ public class MainApplication : IDisposable
         {
             if (user == null)
             {
-                _currentUser = await PerformLogin();
+                var loginView = new LoginView(_userService);
+                _currentUser = await loginView.PerformLogin();
                 if (_currentUser == null)
                 {
                     Console.WriteLine(AnsiColors.Colorize("Login failed or cancelled.", AnsiColors.Red));
@@ -391,150 +540,6 @@ public class MainApplication : IDisposable
         }
     }
 
-    private async Task<User?> PerformLogin()
-    {
-        var allUsers = await _userService.GetAllUsers();
-
-        if (allUsers.Count == 0)
-        {
-            Console.WriteLine(AnsiColors.Colorize("No users found. Let's create your first account.", AnsiColors.Yellow));
-            Console.WriteLine();
-            return await PerformRegistration(isFirstUser: true);
-        }
-
-        Console.WriteLine(AnsiColors.Colorize("User Login:", AnsiColors.Dim));
-
-        for (int i = 0; i < allUsers.Count; i++)
-        {
-            Console.WriteLine($"  {AnsiColors.Colorize((i + 1).ToString(), AnsiColors.Dim)}. {allUsers[i].Username}");
-        }
-        Console.WriteLine($"  {AnsiColors.Colorize((allUsers.Count + 1).ToString(), AnsiColors.Dim)}. {AnsiColors.Colorize("Create New Account", AnsiColors.Dim)}");
-
-        int choice = -1;
-        while (choice < 1 || choice > allUsers.Count + 1)
-        {
-            Console.Write("Select option> ");
-            var input = Console.ReadLine();
-            if (!int.TryParse(input, out choice) || choice < 1 || choice > allUsers.Count + 1)
-            {
-                Console.WriteLine(AnsiColors.Colorize("Invalid choice. Please try again.", AnsiColors.Red));
-                choice = -1;
-            }
-        }
-
-        if (choice == allUsers.Count + 1)
-        {
-            Console.WriteLine();
-            return await PerformRegistration(isFirstUser: false);
-        }
-
-        var selectedUser = allUsers[choice - 1];
-        var existingUser = await _userService.GetUserByUsername(selectedUser.Username);
-
-        return existingUser;
-    }
-
-    private async Task<User?> PerformRegistration(bool isFirstUser, string? username = null)
-    {
-        if (isFirstUser)
-        {
-            Console.WriteLine(AnsiColors.Colorize("First Time Setup", AnsiColors.Green));
-            Console.WriteLine(AnsiColors.Colorize("----------------------", AnsiColors.Green));
-        }
-        else
-        {
-            Console.WriteLine(AnsiColors.Colorize("Create New Account", AnsiColors.Green));
-            Console.WriteLine(AnsiColors.Colorize("----------------------", AnsiColors.Green));
-        }
-
-        if (string.IsNullOrEmpty(username))
-        {
-            while (string.IsNullOrEmpty(username))
-            {
-                Console.Write(AnsiColors.Colorize("Enter username", AnsiColors.Cyan) + ": ");
-                username = Console.ReadLine()?.Trim();
-
-                if (string.IsNullOrEmpty(username))
-                {
-                    Console.WriteLine(AnsiColors.Colorize("Username cannot be empty.", AnsiColors.Red));
-                    continue;
-                }
-
-                var existing = await _userService.GetUserByUsername(username);
-                if (existing != null)
-                {
-                    Console.WriteLine(AnsiColors.Colorize($"Username '{username}' is already taken.", AnsiColors.Red));
-                    username = null;
-                }
-            }
-        }
-
-        Console.Write(AnsiColors.Colorize("Enter email", AnsiColors.Cyan) + AnsiColors.Colorize(" (optional, press Enter to skip)", AnsiColors.Dim) + ": ");
-        var email = Console.ReadLine()?.Trim();
-        if (string.IsNullOrEmpty(email))
-        {
-            email = null;
-        }
-
-        Console.WriteLine();
-        Console.WriteLine(AnsiColors.Colorize("SSH Key Setup (optional):", AnsiColors.Cyan));
-        Console.WriteLine(AnsiColors.Colorize("  • Used for TLS peer authentication", AnsiColors.Dim));
-        Console.WriteLine(AnsiColors.Colorize("  • Generates unique avatar color", AnsiColors.Dim));
-        Console.WriteLine(AnsiColors.Colorize("  • Example: ~/.ssh/id_rsa", AnsiColors.Dim));
-        Console.WriteLine();
-        Console.Write(AnsiColors.Colorize("SSH private key path", AnsiColors.Cyan) + AnsiColors.Colorize(" (press Enter to skip)", AnsiColors.Dim) + ": ");
-        var sshKeyPath = Console.ReadLine()?.Trim();
-
-        if (!string.IsNullOrEmpty(sshKeyPath))
-        {
-            if (sshKeyPath.StartsWith("~/"))
-            {
-                sshKeyPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    sshKeyPath.Substring(2)
-                );
-            }
-
-            if (!File.Exists(sshKeyPath))
-            {
-                Console.WriteLine(AnsiColors.Colorize($"Warning: SSH key file not found at '{sshKeyPath}'", AnsiColors.Yellow));
-                Console.WriteLine(AnsiColors.Colorize("Continuing without SSH key authentication...", AnsiColors.Yellow));
-                sshKeyPath = null;
-            }
-        }
-        else
-        {
-            sshKeyPath = null;
-        }
-
-        Console.WriteLine();
-        Console.WriteLine(AnsiColors.Colorize("Creating account...", AnsiColors.Dim));
-
-        var newUser = await _userService.AuthenticateOrCreateUser(username, email, sshKeyPath);
-
-        if (newUser != null)
-        {
-            Console.WriteLine();
-            Console.WriteLine(AnsiColors.Colorize("Registration Successful:", AnsiColors.Green));
-            Console.WriteLine(AnsiColors.Colorize("✓ Account created successfully!", AnsiColors.Green));
-            Console.WriteLine();
-            Console.WriteLine($"{AnsiColors.Colorize("Username:", AnsiColors.Cyan)} {newUser.Username}");
-            Console.WriteLine($"{AnsiColors.Colorize("Email:", AnsiColors.Cyan)} {newUser.Email ?? AnsiColors.Colorize("Not provided", AnsiColors.Dim)}");
-            Console.WriteLine($"{AnsiColors.Colorize("Avatar Color:", AnsiColors.Cyan)} {newUser.AvatarColor}");
-            var sshStatus = !string.IsNullOrEmpty(newUser.SSHPublicKey) && !newUser.SSHPublicKey.StartsWith("default-")
-                ? AnsiColors.Colorize("Loaded", AnsiColors.Green)
-                : AnsiColors.Colorize("Not configured", AnsiColors.Dim);
-            Console.WriteLine($"{AnsiColors.Colorize("SSH Key:", AnsiColors.Cyan)} {sshStatus}");
-            Console.WriteLine();
-        }
-        else
-        {
-            Console.WriteLine(AnsiColors.Colorize("Failed to create account.", AnsiColors.Red));
-        }
-
-        return newUser;
-    }
-
     private async Task StartServices(string? networkInterface)
     {
         Console.WriteLine(AnsiColors.Colorize("Starting services...", AnsiColors.Dim));
@@ -683,17 +688,17 @@ public class MainApplication : IDisposable
 
         AnsiConsole.MarkupLine("[dim][cyan]d[/]-Devices  [cyan]c[/]-Connections  [cyan]g[/]-Graph  [cyan]n[/]-Scan  [cyan]s[/]-Statistics  [cyan]h[/]-Help  [cyan]q[/]-Quit[/]");
 
-        if (_filteredDevice != null || _highlightedDeviceMACs.Any())
+        if (_uiState.FilteredDevice != null || _uiState.HighlightedDeviceMACs.Any())
         {
             var filterStatus = "";
-            if (_filteredDevice != null)
+            if (_uiState.FilteredDevice != null)
             {
-                filterStatus += $"[yellow]⚠ Filtered to: {_filteredDevice.IPAddress}[/]";
+                filterStatus += $"[yellow]⚠ Filtered to: {_uiState.FilteredDevice.IPAddress}[/]";
             }
-            if (_highlightedDeviceMACs.Any())
+            if (_uiState.HighlightedDeviceMACs.Any())
             {
                 if (filterStatus.Length > 0) filterStatus += " | ";
-                filterStatus += $"[yellow]★ {_highlightedDeviceMACs.Count} highlighted[/]";
+                filterStatus += $"[yellow]★ {_uiState.HighlightedDeviceMACs.Count} highlighted[/]";
             }
             filterStatus += " [dim](Type 'clear')[/]";
             AnsiConsole.MarkupLine(filterStatus);
@@ -784,15 +789,15 @@ public class MainApplication : IDisposable
                 return (true, true);
             case "p":
             case "peers":
-                ShowPeersTable();
+                var peersView = new ConnectionsView(_graphService, _peerService, GetConnectionStatus, FormatRelativeTime,
+                    FormatBytes, RenderViewHeader, RenderToString, PromptSelection, WaitForExit);
+                peersView.ShowPeersTable();
                 return (true, true);
             case "c":
             case "connections":
-                ShowConnectionsTable();
-                return (true, true);
-            case "a":
-            case "avatar":
-                await CustomizeAvatar();
+                var connectionsView = new ConnectionsView(_graphService, _peerService, GetConnectionStatus, FormatRelativeTime,
+                    FormatBytes, RenderViewHeader, RenderToString, PromptSelection, WaitForExit);
+                connectionsView.ShowConnectionsTable();
                 return (true, true);
             case "i":
             case "interface":
@@ -810,7 +815,10 @@ public class MainApplication : IDisposable
                 return (true, true);
             case "e":
             case "export":
-                await ExportGraph();
+                var exportView = new ExportView(_graphService, _captureService, _peerService,
+                    _currentUser, _filterConfig, _uiState, PromptSelection,
+                    CalculateVertexCut, GetMostConnectedDevice);
+                await exportView.ShowExportMenu();
                 return (true, true);
             case "l":
             case "logs":
@@ -819,7 +827,12 @@ public class MainApplication : IDisposable
             case "g":
             case "graph":
             case "network":
-                ShowFullscreenNetworkGraph();
+                RenderViewHeader("Network Topology Graph (Fullscreen)");
+                var graphView = new StatisticsView(_graphService, _captureService, _peerService, _currentUser,
+                    _lastWindowWidth, CalculateVertexCut, GetMostConnectedDevice, FormatBytes,
+                    () => GetLayoutMode() == LayoutMode.TwoColumn ? StatisticsView.LayoutMode.TwoColumn : StatisticsView.LayoutMode.SingleColumn,
+                    RenderDirectedGraphContent, RenderConnectionMatrixContent);
+                graphView.ShowFullscreenNetworkGraph();
                 return (true, true);
             case "n":
             case "scan":
@@ -828,7 +841,12 @@ public class MainApplication : IDisposable
             case "s":
             case "stats":
             case "statistics":
-                ShowStatistics();
+                RenderViewHeader("Network Statistics & Topology Analysis");
+                var statsView = new StatisticsView(_graphService, _captureService, _peerService, _currentUser,
+                    _lastWindowWidth, CalculateVertexCut, GetMostConnectedDevice, FormatBytes,
+                    () => GetLayoutMode() == LayoutMode.TwoColumn ? StatisticsView.LayoutMode.TwoColumn : StatisticsView.LayoutMode.SingleColumn,
+                    RenderDirectedGraphContent, RenderConnectionMatrixContent);
+                statsView.Show();
                 return (true, true);
             case "h":
             case "help":
@@ -901,7 +919,6 @@ public class MainApplication : IDisposable
             .AddColumn($"[default]Full Command[/]")
             .AddColumn($"[default]Description[/]");
 
-        customTable.AddRow($"[default]a[/]", "avatar", "Customize your avatar appearance");
         customTable.AddRow($"[default]e[/]", "export", "Export network graph to DOT/LaTeX format");
 
         AnsiConsole.Write(customTable);
@@ -1092,25 +1109,6 @@ public class MainApplication : IDisposable
         AnsiConsole.Write(new Rule($"[white]Device Details: {device.DeviceName ?? device.IPAddress}[/]").RuleStyle(Style.Parse("grey37")));
         AnsiConsole.WriteLine();
 
-        Avatar? avatar = null;
-        string avatarColor = "#FFFFFF";
-        string avatarType = "Unknown";
-
-        if (device.TLSPeer != null)
-        {
-            avatar = AvatarUtility.GetAvatar(device.TLSPeer.AvatarType);
-            avatarColor = device.TLSPeer.AvatarColor;
-            avatarType = device.TLSPeer.AvatarType;
-        }
-        else
-        {
-            var avatarIndex = Math.Abs(device.MACAddress.GetHashCode()) % AvatarUtility.GetAvatarEnums().Count;
-            var avatarEnum = AvatarUtility.GetAvatarEnums()[avatarIndex];
-            avatar = AvatarUtility.GetAvatar(avatarEnum);
-            avatarColor = AvatarUtility.GenerateColorFromSSHKey(device.MACAddress);
-            avatarType = avatarEnum;
-        }
-
         var basicGrid = new Grid();
         basicGrid.AddColumn();
         basicGrid.AddColumn();
@@ -1197,8 +1195,6 @@ public class MainApplication : IDisposable
             peerGrid.AddColumn();
 
             peerGrid.AddRow(new Markup("[bold]Username:[/]"), new Markup(Markup.Escape(device.TLSPeer.Username)));
-            peerGrid.AddRow(new Markup("[bold]Avatar Type:[/]"), new Markup(Markup.Escape(avatarType)));
-            peerGrid.AddRow(new Markup("[bold]Avatar Color:[/]"), new Markup(Markup.Escape(avatarColor)));
             peerGrid.AddRow(new Markup("[bold]Port:[/]"), new Markup($"{device.TLSPeer.Port}"));
             peerGrid.AddRow(new Markup("[bold]Connected:[/]"), new Markup(device.TLSPeer.IsConnected ? "[green]Yes[/]" : "[dim]No[/]"));
 
@@ -1444,11 +1440,11 @@ public class MainApplication : IDisposable
             };
 
             var statusLines = new List<string>();
-            if (_filteredDevice != null)
+            if (_uiState.FilteredDevice != null)
             {
-                statusLines.Add($"[yellow]⚠ Network view filtered to: {_filteredDevice.IPAddress}[/]");
+                statusLines.Add($"[yellow]⚠ Network view filtered to: {_uiState.FilteredDevice.IPAddress}[/]");
             }
-            if (_highlightedDeviceMACs.Contains(device.MACAddress))
+            if (_uiState.HighlightedDeviceMACs.Contains(device.MACAddress))
             {
                 statusLines.Add($"[cyan]★ This device is highlighted[/]");
             }
@@ -1503,13 +1499,7 @@ public class MainApplication : IDisposable
 
     private void FilterByDevice(Device device)
     {
-        _filteredDevice = device;
-        lock (_refreshLock)
-        {
-            _dashboardNeedsRefresh = true;
-        }
-        Log.Information($"Filtered network view to device: {device.IPAddress} ({device.MACAddress})");
-
+        _uiState.SetFilteredDevice(device);
         AnsiConsole.MarkupLine($"[green]✓[/] Network view filtered to [cyan]{device.IPAddress}[/]");
         AnsiConsole.MarkupLine("[dim]Type 'clear' in the main dashboard to clear filter[/]");
         Thread.Sleep(2000);
@@ -1517,40 +1507,26 @@ public class MainApplication : IDisposable
 
     private void HighlightDevice(Device device)
     {
-        if (_highlightedDeviceMACs.Contains(device.MACAddress))
-        {
-            _highlightedDeviceMACs.Remove(device.MACAddress);
-            Log.Information($"Removed highlight from device: {device.IPAddress} ({device.MACAddress})");
-            AnsiConsole.MarkupLine($"[yellow]★[/] Highlight removed from [cyan]{device.IPAddress}[/]");
-        }
-        else
-        {
-            _highlightedDeviceMACs.Add(device.MACAddress);
-            Log.Information($"Highlighted device: {device.IPAddress} ({device.MACAddress})");
-            AnsiConsole.MarkupLine($"[yellow]★[/] Device [cyan]{device.IPAddress}[/] highlighted");
-        }
+        bool wasHighlighted = _uiState.HighlightedDeviceMACs.Contains(device.MACAddress);
 
-        lock (_refreshLock)
-        {
-            _dashboardNeedsRefresh = true;
-        }
+        _uiState.ToggleHighlight(device.MACAddress);
+
+        if (wasHighlighted)
+            AnsiConsole.MarkupLine($"[yellow]★[/] Highlight removed from [cyan]{device.IPAddress}[/]");
+        else
+            AnsiConsole.MarkupLine($"[yellow]★[/] Device [cyan]{device.IPAddress}[/] highlighted");
+
         Thread.Sleep(1500);
     }
 
     private void ClearFilters()
     {
-        bool hadFilters = _filteredDevice != null || _highlightedDeviceMACs.Any();
+        bool hadFilters = _uiState.FilteredDevice != null || _uiState.HighlightedDeviceMACs.Any();
 
-        _filteredDevice = null;
-        _highlightedDeviceMACs.Clear();
+        _uiState.ClearFilters();
 
         if (hadFilters)
         {
-            lock (_refreshLock)
-            {
-                _dashboardNeedsRefresh = true;
-            }
-            Log.Information("Cleared all device filters and highlights");
             AnsiConsole.MarkupLine("[green]✓[/] Filters and highlights cleared");
         }
         else
@@ -1665,42 +1641,12 @@ public class MainApplication : IDisposable
             var device = devices[index];
             AnsiConsole.Clear();
 
-            Avatar? avatar = null;
-            string avatarColor = "#FFFFFF";
-            string avatarType = "Unknown";
-
-            if (device.TLSPeer != null)
-            {
-                avatar = AvatarUtility.GetAvatar(device.TLSPeer.AvatarType);
-                avatarColor = device.TLSPeer.AvatarColor;
-                avatarType = device.TLSPeer.AvatarType;
-            }
-            else
-            {
-                var avatarIndex = Math.Abs(device.MACAddress.GetHashCode()) % AvatarUtility.GetAvatarEnums().Count;
-                var avatarEnum = AvatarUtility.GetAvatarEnums()[avatarIndex];
-                avatar = AvatarUtility.GetAvatar(avatarEnum);
-                avatarColor = AvatarUtility.GenerateColorFromSSHKey(device.MACAddress);
-                avatarType = avatarEnum;
-            }
-
-            var avatarArt = "";
-            if (avatar != null)
-            {
-                foreach (var line in avatar.Appearance)
-                {
-                    avatarArt += line + "\n";
-                }
-            }
-
             var peerInfo = "";
             if (device.TLSPeer != null)
             {
                 peerInfo = $@"
 [default]TLS Peer Info:[/]
   Username: {device.TLSPeer.Username}
-  Avatar: {avatarType}
-  Color: {avatarColor}
   Connected: {(device.TLSPeer.IsConnected ? "[green]Yes[/]" : "No")}
 ";
             }
@@ -1710,9 +1656,7 @@ public class MainApplication : IDisposable
                 c.SourceDevice == device ? c.DestinationDevice.IPAddress : c.SourceDevice.IPAddress
             ));
 
-            var detailsText = $@"[default]Avatar:[/]
-{avatarArt}
-[default]Device Information:[/]
+            var detailsText = $@"[default]Device Information:[/]
   Device: {device.DeviceName ?? "Unknown"}
   IP: {device.IPAddress}
   MAC: {device.MACAddress}
@@ -1748,615 +1692,8 @@ public class MainApplication : IDisposable
     }
 
 
-    private void ShowPeersTable()
-    {
-        RenderViewHeader("TLS Peers");
 
-        var peers = _peerService?.GetDiscoveredPeers() ?? new List<TLSPeer>();
 
-        if (peers.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[yellow]No peers discovered yet.[/]");
-
-            if (AnsiConsole.Confirm("Announce your presence to the network?", true))
-            {
-                _peerService?.AnnouncePeer();
-                AnsiConsole.MarkupLine("[green]Peer announcement sent![/]");
-            }
-            return;
-        }
-
-        var table = new Table()
-            .Border(TableBorder.Markdown)
-            .BorderColor(Color.Default)
-            .AddColumn(new TableColumn("[default]Status[/]").Centered())
-            .AddColumn("[default]Username[/]")
-            .AddColumn("[default]IP Address[/]")
-            .AddColumn("[default]Avatar[/]")
-            .AddColumn("[default]Color[/]")
-            .AddColumn("[default]Discovered[/]");
-
-        foreach (var peer in peers.OrderByDescending(p => p.LastConnected))
-        {
-            var status = peer.IsConnected ? "[green]●[/]" : "○";
-            var discovered = (DateTime.Now - peer.LastConnected).TotalSeconds < 60
-                ? "[green]Recently[/]"
-                : $"{(DateTime.Now - peer.LastConnected).TotalMinutes:F0}m ago";
-
-            table.AddRow(
-                status,
-                peer.Username,
-                peer.IPAddress?.ToString() ?? "Unknown",
-                peer.AvatarType,
-                peer.AvatarColor,
-                discovered
-            );
-        }
-
-        AnsiConsole.Write(table);
-
-        if (AnsiConsole.Confirm("\nAnnounce your presence to the network?", false))
-        {
-            _peerService?.AnnouncePeer();
-            AnsiConsole.MarkupLine("[green]Peer announcement sent![/]");
-        }
-    }
-
-    private void ShowConnectionsTable()
-    {
-        bool viewing = true;
-
-        while (viewing)
-        {
-            var connections = _graphService.GetAllConnections();
-
-            if (connections.Count == 0)
-            {
-                AnsiConsole.Clear();
-                AnsiConsole.MarkupLine("[bold]TLScope[/][dim] Network Security Visualization Tool[/]");
-                AnsiConsole.Write(new Rule($"[white]Network Connections[/]").RuleStyle(Style.Parse("grey37")));
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[yellow]No connections detected yet.[/]");
-                AnsiConsole.WriteLine();
-                WaitForExit();
-                return;
-            }
-
-            var table = new Table()
-                .Border(TableBorder.Markdown)
-                .BorderColor(Color.Grey37)
-                .ShowRowSeparators()
-                .AddColumn(new TableColumn($"[bold white]Status[/]").Centered())
-                .AddColumn($"[bold white]Type[/]")
-                .AddColumn($"[bold white]Source Device[/]")
-                .AddColumn(new TableColumn($"[bold white]→[/]").Centered())
-                .AddColumn($"[bold white]Destination Device[/]")
-                .AddColumn($"[bold white]Protocol[/]")
-                .AddColumn(new TableColumn($"[bold white]Packets[/]").RightAligned())
-                .AddColumn(new TableColumn($"[bold white]Bytes[/]").RightAligned())
-                .AddColumn($"[bold white]First Seen[/]")
-                .AddColumn($"[bold white]Last Seen[/]");
-
-            var orderedConnections = connections
-                .OrderByDescending(c => c.IsTLSPeerConnection)
-                .ThenByDescending(c => c.IsActive)
-                .ThenByDescending(c => c.LastSeen)
-                .ToList();
-
-            foreach (var conn in orderedConnections)
-            {
-                var status = GetConnectionStatus(conn);
-
-                var connType = conn.Type switch
-                {
-                    ConnectionType.DirectL2 => "[cyan]Direct L2[/]",
-                    ConnectionType.RoutedL3 => "[yellow]Routed L3[/]",
-                    ConnectionType.Internet => "[orange1]Internet[/]",
-                    ConnectionType.TLSPeer => "[green]TLS Peer[/]",
-                    _ => "[dim]Unknown[/]"
-                };
-
-                var sourceName = conn.SourceDevice.DeviceName ?? conn.SourceDevice.Hostname ?? conn.SourceDevice.IPAddress;
-                var destName = conn.DestinationDevice.DeviceName ?? conn.DestinationDevice.Hostname ?? conn.DestinationDevice.IPAddress;
-
-                var protocol = conn.Protocol ?? "Unknown";
-                if (conn.SourcePort.HasValue || conn.DestinationPort.HasValue)
-                {
-                    var ports = $"{conn.SourcePort}→{conn.DestinationPort}";
-                    protocol = $"{protocol} ({ports})";
-                }
-
-                var firstSeen = FormatRelativeTime(conn.FirstSeen);
-                var lastSeen = FormatRelativeTime(conn.LastSeen);
-
-                table.AddRow(
-                    status,
-                    connType,
-                    Markup.Escape(sourceName),
-                    "→",
-                    Markup.Escape(destName),
-                    protocol,
-                    conn.PacketCount.ToString("N0"),
-                    FormatBytes(conn.BytesTransferred),
-                    firstSeen,
-                    lastSeen
-                );
-            }
-
-            string renderedTable = RenderToString(table);
-
-            var mainHeader = new List<string>();
-            mainHeader.Add(RenderToString(new Markup("[bold]TLScope[/][dim] Network Security Visualization Tool[/]")).TrimEnd());
-            mainHeader.Add(RenderToString(new Rule($"[white]Network Connections[/]").RuleStyle(Style.Parse("grey37"))).TrimEnd());
-
-            var tableLines = renderedTable.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-
-            var allHeaderLines = tableLines.Take(3).ToArray();
-
-            var titleLine = allHeaderLines.Length > 0 ? allHeaderLines[0] : "";
-            var remainingHeaders = allHeaderLines.Length > 1 ? allHeaderLines.Skip(1).ToArray() : Array.Empty<string>();
-
-            var dataRows = tableLines.Skip(3).ToList();
-
-            var selectableRows = new List<string>();
-            var rowToConnectionMap = new Dictionary<string, Connection>();
-            int connectionIndex = 0;
-
-            foreach (var row in dataRows)
-            {
-                var cleanRow = System.Text.RegularExpressions.Regex.Replace(row, @"\x1b\[[0-9;]*m", "");
-
-                if (string.IsNullOrWhiteSpace(cleanRow))
-                {
-                    continue;
-                }
-
-                if (cleanRow.All(c => "─│├┤┬┴┼╭╮╰╯═║╔╗╚╝╠╣╦╩╬ :|+-".Contains(c)))
-                {
-                    continue;
-                }
-
-                if (cleanRow.Contains(":--:") || cleanRow.Contains("---"))
-                {
-                    continue;
-                }
-
-                if (connectionIndex < orderedConnections.Count)
-                {
-                    selectableRows.Add(row);
-                    rowToConnectionMap[row] = orderedConnections[connectionIndex];
-                    connectionIndex++;
-                }
-            }
-
-            var selectedRow = PromptSelection(
-                titleLine,
-                selectableRows,
-                pageSize: Console.WindowHeight - 15,
-                isRawAnsi: true,
-                headerLines: remainingHeaders,
-                mainHeaderLines: mainHeader.ToArray()
-            );
-
-            if (selectedRow != null && rowToConnectionMap.ContainsKey(selectedRow))
-            {
-                ShowConnectionDetails(rowToConnectionMap[selectedRow]);
-            }
-            else
-            {
-                viewing = false;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Show comprehensive connection details when selected
-    /// </summary>
-    private void ShowConnectionDetails(Connection connection)
-    {
-        AnsiConsole.Clear();
-        AnsiConsole.MarkupLine("[bold]TLScope[/][dim] Network Security Visualization Tool[/]");
-        AnsiConsole.Write(new Rule($"[white]Connection Details[/]").RuleStyle(Style.Parse("grey37")));
-        AnsiConsole.WriteLine();
-
-        var overviewGrid = new Grid();
-        overviewGrid.AddColumn();
-        overviewGrid.AddColumn();
-
-        var statusMarkup = connection.IsActive ? "[green]✓ Active[/]" : "[grey37]✗ Inactive[/]";
-        overviewGrid.AddRow(new Markup("[bold]Status:[/]"), new Markup(statusMarkup));
-
-        var connType = connection.Type switch
-        {
-            ConnectionType.DirectL2 => "[cyan]Direct Layer 2 (Same LAN)[/]",
-            ConnectionType.RoutedL3 => "[yellow]Routed Layer 3 (Through Gateway)[/]",
-            ConnectionType.Internet => "[orange1]Internet Connection[/]",
-            ConnectionType.TLSPeer => "[green]TLScope Peer-to-Peer[/]",
-            _ => "[dim]Unknown[/]"
-        };
-        overviewGrid.AddRow(new Markup("[bold]Connection Type:[/]"), new Markup(connType));
-
-        if (connection.IsTLSPeerConnection)
-        {
-            overviewGrid.AddRow(new Markup("[bold]TLScope Peer:[/]"), new Markup("[green]✓ Yes[/]"));
-        }
-
-        AnsiConsole.Write(new Panel(overviewGrid).Header("[cyan]Overview[/]").Border(BoxBorder.Ascii));
-        AnsiConsole.WriteLine();
-
-        var endpointsGrid = new Grid();
-        endpointsGrid.AddColumn();
-        endpointsGrid.AddColumn();
-
-        var sourceName = connection.SourceDevice.DeviceName ?? connection.SourceDevice.Hostname ?? connection.SourceDevice.IPAddress;
-        var destName = connection.DestinationDevice.DeviceName ?? connection.DestinationDevice.Hostname ?? connection.DestinationDevice.IPAddress;
-
-        endpointsGrid.AddRow(new Markup("[bold]Source:[/]"), new Markup(Markup.Escape(sourceName)));
-        endpointsGrid.AddRow(new Markup("[bold]Source IP:[/]"), new Markup(Markup.Escape(connection.SourceDevice.IPAddress)));
-        endpointsGrid.AddRow(new Markup("[bold]Source MAC:[/]"), new Markup(Markup.Escape(connection.SourceDevice.MACAddress)));
-        if (connection.SourcePort.HasValue)
-            endpointsGrid.AddRow(new Markup("[bold]Source Port:[/]"), new Markup(connection.SourcePort.Value.ToString()));
-
-        endpointsGrid.AddRow(new Text(""), new Text(""));
-
-        endpointsGrid.AddRow(new Markup("[bold]Destination:[/]"), new Markup(Markup.Escape(destName)));
-        endpointsGrid.AddRow(new Markup("[bold]Destination IP:[/]"), new Markup(Markup.Escape(connection.DestinationDevice.IPAddress)));
-        endpointsGrid.AddRow(new Markup("[bold]Destination MAC:[/]"), new Markup(Markup.Escape(connection.DestinationDevice.MACAddress)));
-        if (connection.DestinationPort.HasValue)
-            endpointsGrid.AddRow(new Markup("[bold]Destination Port:[/]"), new Markup(connection.DestinationPort.Value.ToString()));
-
-        AnsiConsole.Write(new Panel(endpointsGrid).Header("[yellow]Endpoints[/]").Border(BoxBorder.Ascii));
-        AnsiConsole.WriteLine();
-
-        var protocolGrid = new Grid();
-        protocolGrid.AddColumn();
-        protocolGrid.AddColumn();
-
-        protocolGrid.AddRow(new Markup("[bold]Protocol:[/]"), new Markup(Markup.Escape(connection.Protocol ?? "Unknown")));
-
-        if (connection.State != null)
-            protocolGrid.AddRow(new Markup("[bold]State:[/]"), new Markup(Markup.Escape(connection.State)));
-
-        if (connection.MinTTL.HasValue)
-            protocolGrid.AddRow(new Markup("[bold]Min TTL:[/]"), new Markup(connection.MinTTL.Value.ToString()));
-
-        if (connection.MaxTTL.HasValue)
-            protocolGrid.AddRow(new Markup("[bold]Max TTL:[/]"), new Markup(connection.MaxTTL.Value.ToString()));
-
-        if (connection.AverageTTL.HasValue)
-            protocolGrid.AddRow(new Markup("[bold]Average TTL:[/]"), new Markup(connection.AverageTTL.Value.ToString()));
-
-        if (connection.PacketCountForTTL > 0)
-            protocolGrid.AddRow(new Markup("[bold]TTL Samples:[/]"), new Markup($"{connection.PacketCountForTTL} packets"));
-
-        AnsiConsole.Write(new Panel(protocolGrid).Header("[white]Protocol & Routing[/]").Border(BoxBorder.Ascii));
-        AnsiConsole.WriteLine();
-
-        var trafficGrid = new Grid();
-        trafficGrid.AddColumn();
-        trafficGrid.AddColumn();
-
-        trafficGrid.AddRow(new Markup("[bold]Total Packets:[/]"), new Markup($"{connection.PacketCount:N0}"));
-        trafficGrid.AddRow(new Markup("[bold]Total Bytes:[/]"), new Markup(FormatBytes(connection.BytesTransferred)));
-
-        AnsiConsole.Write(new Panel(trafficGrid).Header("[cyan]Traffic Statistics[/]").Border(BoxBorder.Ascii));
-        AnsiConsole.WriteLine();
-
-        var timelineGrid = new Grid();
-        timelineGrid.AddColumn();
-        timelineGrid.AddColumn();
-
-        timelineGrid.AddRow(new Markup("[bold]First Seen:[/]"), new Markup(FormatRelativeTime(connection.FirstSeen)));
-        timelineGrid.AddRow(new Markup("[bold]Last Seen:[/]"), new Markup(FormatRelativeTime(connection.LastSeen)));
-
-        var duration = connection.LastSeen - connection.FirstSeen;
-        var durationStr = duration.TotalDays >= 1
-            ? $"{duration.TotalDays:F1} days"
-            : duration.TotalHours >= 1
-                ? $"{duration.TotalHours:F1} hours"
-                : $"{duration.TotalMinutes:F0} minutes";
-        timelineGrid.AddRow(new Markup("[bold]Duration:[/]"), new Markup(durationStr));
-
-        AnsiConsole.Write(new Panel(timelineGrid).Header("[white]Timeline[/]").Border(BoxBorder.Ascii));
-        AnsiConsole.WriteLine();
-
-        WaitForExit();
-    }
-
-    private async Task CustomizeAvatar()
-    {
-        if (_currentUser == null) return;
-
-        var avatarLines = _userService.GetUserAvatar(_currentUser).ToArray();
-
-        var lineVariations = new List<string>[4];
-        for (int i = 0; i < 4; i++)
-        {
-            lineVariations[i] = GetLineVariations(i);
-        }
-
-        var lineOptionIndices = new int[4];
-        for (int i = 0; i < 4; i++)
-        {
-            var index = lineVariations[i].IndexOf(avatarLines[i]);
-            lineOptionIndices[i] = index >= 0 ? index : 0;
-            avatarLines[i] = lineVariations[i][lineOptionIndices[i]];
-        }
-
-        int selectedLine = 0;
-        bool isDirty = false;
-        bool exit = false;
-
-        while (!exit)
-        {
-            RenderCenteredAvatar(avatarLines, selectedLine, isDirty, lineOptionIndices, lineVariations);
-
-            var key = Console.ReadKey(intercept: true);
-
-            switch (key.Key)
-            {
-                case ConsoleKey.UpArrow:
-                    selectedLine = Math.Max(0, selectedLine - 1);
-                    break;
-
-                case ConsoleKey.DownArrow:
-                    selectedLine = Math.Min(3, selectedLine + 1);  // Avatar has 4 lines (0-3)
-                    break;
-
-                case ConsoleKey.LeftArrow:
-                    lineOptionIndices[selectedLine] = (lineOptionIndices[selectedLine] - 1 + lineVariations[selectedLine].Count)
-                                                      % lineVariations[selectedLine].Count;
-                    avatarLines[selectedLine] = lineVariations[selectedLine][lineOptionIndices[selectedLine]];
-                    isDirty = true;
-                    break;
-
-                case ConsoleKey.RightArrow:
-                    lineOptionIndices[selectedLine] = (lineOptionIndices[selectedLine] + 1)
-                                                      % lineVariations[selectedLine].Count;
-                    avatarLines[selectedLine] = lineVariations[selectedLine][lineOptionIndices[selectedLine]];
-                    isDirty = true;
-                    break;
-
-                case ConsoleKey.S:
-                    await _userService.SaveCustomAvatar(_currentUser, avatarLines);
-                    AnsiConsole.Clear();
-                    AnsiConsole.MarkupLine("[green]✓ Custom avatar saved![/]");
-                    await Task.Delay(1000);
-                    exit = true;
-                    break;
-
-                case ConsoleKey.R:
-                    await ResetToPredefinedAvatar();
-                    exit = true;
-                    break;
-
-                case ConsoleKey.Escape:
-                    if (isDirty)
-                    {
-                        AnsiConsole.Clear();
-                        if (AnsiConsole.Confirm("[yellow]You have unsaved changes. Exit anyway?[/]", false))
-                        {
-                            exit = true;
-                        }
-                    }
-                    else
-                    {
-                        exit = true;
-                    }
-                    break;
-            }
-        }
-    }
-
-    private void RenderCenteredAvatar(string[] avatarLines, int selectedLine, bool isDirty,
-                                       int[] lineOptionIndices, List<string>[] lineVariations)
-    {
-        AnsiConsole.Clear();
-
-        var sshKey = _currentUser?.SSHPublicKey ?? "No SSH Key";
-        var avatarColor = _currentUser?.AvatarColor ?? "#FFFFFF";
-        var spectreColor = AvatarUtility.HexToSpectreColor(avatarColor);
-
-        var randomartLines = SSHRandomart.GenerateRandomart(sshKey);
-
-        var leftContent = new List<Text>();
-        leftContent.Add(new Text(""));
-        leftContent.Add(new Text("  Your Identity  "));
-        leftContent.Add(new Text(""));
-
-        foreach (var line in randomartLines)
-        {
-            leftContent.Add(new Text(line, new Style(spectreColor)));
-        }
-
-        leftContent.Add(new Text(""));
-        leftContent.Add(new Text($"Color: {avatarColor}"));
-        leftContent.Add(new Text(""));
-
-        leftContent.Add(new Text("██████████████", new Style(spectreColor)));
-        leftContent.Add(new Text("██████████████", new Style(spectreColor)));
-        leftContent.Add(new Text("██████████████", new Style(spectreColor)));
-        leftContent.Add(new Text(""));
-
-        var rightContent = new List<Text>();
-        rightContent.Add(new Text(""));
-        rightContent.Add(new Text($"Customize Avatar{(isDirty ? " *" : "")}"));
-        rightContent.Add(new Text(""));
-
-        for (int i = 0; i < avatarLines.Length; i++)
-        {
-            var line = avatarLines[i];
-
-            if (i == selectedLine)
-            {
-                var styledText = new Text($"*{line}*", new Style(spectreColor));
-                rightContent.Add(styledText);
-            }
-            else
-            {
-                rightContent.Add(new Text(line, new Style(spectreColor)));
-            }
-        }
-
-        rightContent.Add(new Text(""));
-
-        var combinedTable = new Table()
-            .Border(TableBorder.Markdown)
-            .BorderColor(spectreColor)
-            .HideHeaders()
-            .AddColumn(new TableColumn("").Centered())
-            .AddColumn(new TableColumn("").Centered());
-
-        int maxRows = Math.Max(leftContent.Count, rightContent.Count);
-
-        for (int i = 0; i < maxRows; i++)
-        {
-            var left = i < leftContent.Count ? leftContent[i] : new Text("");
-            var right = i < rightContent.Count ? rightContent[i] : new Text("");
-            combinedTable.AddRow(left, right);
-        }
-
-        int consoleHeight = Console.WindowHeight;
-        int contentHeight = 25; // Approximate height of content
-        int topPadding = Math.Max(0, (consoleHeight - contentHeight) / 2);
-
-        for (int i = 0; i < topPadding; i++)
-        {
-            AnsiConsole.WriteLine();
-        }
-
-        AnsiConsole.Write(Align.Center(combinedTable));
-
-        Console.WriteLine();
-        Console.WriteLine();
-        var instructions = "[dim]↑/↓[/] Select Line  [dim]│[/]  " +
-                          "[dim]←/→[/] Change  [dim]│[/]  " +
-                          "S Save  [dim]│[/]  " +
-                          "[yellow]R[/] Reset  [dim]│[/]  " +
-                          "[red]Esc[/] Cancel";
-        AnsiConsole.Write(Align.Center(new Markup(instructions)));
-
-        var lineInfo = $"[dim]Line {selectedLine + 1}/4  •  Option {lineOptionIndices[selectedLine] + 1}/{lineVariations[selectedLine].Count}[/]";
-        Console.WriteLine();
-        AnsiConsole.Write(Align.Center(new Markup(lineInfo)));
-    }
-
-    /// <summary>
-    /// Hardcoded avatar line options extracted from appearances.json
-    /// </summary>
-    private static readonly Dictionary<int, List<string>> HardcodedLineOptions = new()
-    {
-        [0] = new List<string>
-        {
-            "       ",  // empty
-            "   o   ",  // simple dot
-            "  _*_  ",  // devil horns
-            "   V   ",  // knight helmet
-            "  ,/^\\_", // wizard hat
-            ".( - ).", // silly
-            "   .   "   // skeleton
-        },
-
-        [1] = new List<string>
-        {
-            "  ───  ",      // head var 1
-            " .---. ",      // head var 2
-            "./\\_/\\.",    // Cat Ears
-            " _---_ ",      // monk
-            "./|-|\\.",     // devil
-            "_/___{_",      // wizard
-            "(/\\|/\\)",    // silly
-            ".n_._n."       // bear ears
-        },
-
-        [2] = new List<string>
-        {
-            "(     )", // empty
-            "( . . )", // beady eyes
-            "( .L. )", // strong nose
-            "c .l. Ↄ", // monkey
-            "< . . >", // elf ears
-            "{(\\./)}", // angry
-            "( ^.^ )", // happy
-            "( o.^ )", // wink
-            "( =,= )", // sleepy
-            "( o,o )", // snotty
-            "( $.$ )", // money
-            "( o.o )", // normal round
-            "( v.v )", // monk
-            "( @.@ )", // devil
-            "(\\\\|//)", // knight
-            "( o.o T", // wizard
-            "([o.o])", // ninja
-            "(.oCo.)", // silly
-            ". 0▲0 .", // skeleton
-            "| . . |", // square
-            "(#o.0 )", // zombie
-            "( o^o )"  // vamp
-        },
-
-        [3] = new List<string>
-        {
-            " >   < ", // empty
-            " > - < ", // normal
-            " > ∩ < ", // sad
-            " > u < ", // happy round
-            "Zzz^ < ", // sleepy
-            "H> - <n", // monk
-            "=> v <=", // devil
-            "T> u < ", // knight
-            " > W <|", // wizard
-            " > = < ", // silly
-            " >)m(< ", // skeleton
-            " >_C#< ", // zombie
-            "^>v v<^"  // vamp
-        }
-    };
-
-    private List<string> GetLineVariations(int lineIndex)
-    {
-        var variations = new List<string>(HardcodedLineOptions[lineIndex]);
-
-        try
-        {
-            var allAvatars = AvatarUtility.LoadAvatars();
-            var customLines = allAvatars
-                .Select(a => a.Appearance[lineIndex])
-                .Distinct()
-                .Where(line => !variations.Contains(line)) // Only add new custom lines
-                .ToList();
-
-            variations.AddRange(customLines);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to load custom avatar variations");
-        }
-
-        return variations;
-    }
-
-    private async Task ResetToPredefinedAvatar()
-    {
-        if (_currentUser == null) return;
-
-        AnsiConsole.Clear();
-        var avatars = AvatarUtility.GetAvatarEnums();
-        avatars.Add("[yellow]« Cancel[/]");
-
-        var selectedAvatar = PromptSelection("[default]Choose a predefined avatar:[/]", avatars, pageSize: 15);
-
-        if (selectedAvatar == null || selectedAvatar.Contains("Cancel"))
-        {
-            return;
-        }
-
-        _currentUser.AvatarType = selectedAvatar;
-        await _userService.ClearCustomAvatar(_currentUser);
-
-        AnsiConsole.MarkupLine($"[green]✓ Avatar reset to {selectedAvatar}[/]");
-        await Task.Delay(1000);
-    }
 
     private async Task ManageNetworkInterface()
     {
@@ -2429,15 +1766,15 @@ public class MainApplication : IDisposable
 
             grid.AddRow(
                 new Markup("[bold]Excluded IPs:[/]"),
-                new Markup(_excludedIPs.Count > 0 ? string.Join(", ", _excludedIPs) : "[dim]none[/]")
+                new Markup(_uiState.ExcludedIPs.Count > 0 ? string.Join(", ", _uiState.ExcludedIPs) : "[dim]none[/]")
             );
             grid.AddRow(
                 new Markup("[bold]Excluded Hostnames:[/]"),
-                new Markup(_excludedHostnames.Count > 0 ? string.Join(", ", _excludedHostnames) : "[dim]none[/]")
+                new Markup(_uiState.ExcludedHostnames.Count > 0 ? string.Join(", ", _uiState.ExcludedHostnames) : "[dim]none[/]")
             );
             grid.AddRow(
                 new Markup("[bold]Excluded MACs:[/]"),
-                new Markup(_excludedMACs.Count > 0 ? string.Join(", ", _excludedMACs) : "[dim]none[/]")
+                new Markup(_uiState.ExcludedMACs.Count > 0 ? string.Join(", ", _uiState.ExcludedMACs) : "[dim]none[/]")
             );
 
             AnsiConsole.Write(grid);
@@ -2467,38 +1804,38 @@ public class MainApplication : IDisposable
             {
                 case "Add IP Address":
                     var ip = AnsiConsole.Ask<string>("Enter IP address to exclude:");
-                    _excludedIPs.Add(ip);
-                    SaveExclusionsConfig();
+                    _uiState.ExcludedIPs.Add(ip);
+                    _uiState.SaveExclusions();
                     AnsiConsole.MarkupLine($"[green]Added {ip} to exclusions[/]");
                     Thread.Sleep(1000);
                     break;
 
                 case "Add Hostname":
                     var hostname = AnsiConsole.Ask<string>("Enter hostname to exclude:");
-                    _excludedHostnames.Add(hostname);
-                    SaveExclusionsConfig();
+                    _uiState.ExcludedHostnames.Add(hostname);
+                    _uiState.SaveExclusions();
                     AnsiConsole.MarkupLine($"[green]Added {hostname} to exclusions[/]");
                     Thread.Sleep(1000);
                     break;
 
                 case "Add MAC Address":
                     var mac = AnsiConsole.Ask<string>("Enter MAC address to exclude (e.g., AA:BB:CC:DD:EE:FF):");
-                    _excludedMACs.Add(mac);
-                    SaveExclusionsConfig();
+                    _uiState.ExcludedMACs.Add(mac);
+                    _uiState.SaveExclusions();
                     AnsiConsole.MarkupLine($"[green]Added {mac} to exclusions[/]");
                     Thread.Sleep(1000);
                     break;
 
                 case "Remove IP Address":
-                    if (_excludedIPs.Count > 0)
+                    if (_uiState.ExcludedIPs.Count > 0)
                     {
-                        var ipChoices = _excludedIPs.Concat(new[] { "[yellow]« Cancel[/]" }).ToList();
+                        var ipChoices = _uiState.ExcludedIPs.Concat(new[] { "[yellow]« Cancel[/]" }).ToList();
                         var ipToRemove = PromptSelection("Select IP to remove:", ipChoices);
 
                         if (ipToRemove != null && !ipToRemove.Contains("Cancel"))
                         {
-                            _excludedIPs.Remove(ipToRemove);
-                            SaveExclusionsConfig();
+                            _uiState.ExcludedIPs.Remove(ipToRemove);
+                            _uiState.SaveExclusions();
                             AnsiConsole.MarkupLine($"[yellow]Removed {ipToRemove} from exclusions[/]");
                             Thread.Sleep(1000);
                         }
@@ -2511,15 +1848,15 @@ public class MainApplication : IDisposable
                     break;
 
                 case "Remove Hostname":
-                    if (_excludedHostnames.Count > 0)
+                    if (_uiState.ExcludedHostnames.Count > 0)
                     {
-                        var hostnameChoices = _excludedHostnames.Concat(new[] { "[yellow]« Cancel[/]" }).ToList();
+                        var hostnameChoices = _uiState.ExcludedHostnames.Concat(new[] { "[yellow]« Cancel[/]" }).ToList();
                         var hostnameToRemove = PromptSelection("Select hostname to remove:", hostnameChoices);
 
                         if (hostnameToRemove != null && !hostnameToRemove.Contains("Cancel"))
                         {
-                            _excludedHostnames.Remove(hostnameToRemove);
-                            SaveExclusionsConfig();
+                            _uiState.ExcludedHostnames.Remove(hostnameToRemove);
+                            _uiState.SaveExclusions();
                             AnsiConsole.MarkupLine($"[yellow]Removed {hostnameToRemove} from exclusions[/]");
                             Thread.Sleep(1000);
                         }
@@ -2532,15 +1869,15 @@ public class MainApplication : IDisposable
                     break;
 
                 case "Remove MAC Address":
-                    if (_excludedMACs.Count > 0)
+                    if (_uiState.ExcludedMACs.Count > 0)
                     {
-                        var macChoices = _excludedMACs.Concat(new[] { "[yellow]« Cancel[/]" }).ToList();
+                        var macChoices = _uiState.ExcludedMACs.Concat(new[] { "[yellow]« Cancel[/]" }).ToList();
                         var macToRemove = PromptSelection("Select MAC to remove:", macChoices);
 
                         if (macToRemove != null && !macToRemove.Contains("Cancel"))
                         {
-                            _excludedMACs.Remove(macToRemove);
-                            SaveExclusionsConfig();
+                            _uiState.ExcludedMACs.Remove(macToRemove);
+                            _uiState.SaveExclusions();
                             AnsiConsole.MarkupLine($"[yellow]Removed {macToRemove} from exclusions[/]");
                             Thread.Sleep(1000);
                         }
@@ -2555,10 +1892,10 @@ public class MainApplication : IDisposable
                 case "Clear All Exclusions":
                     if (AnsiConsole.Confirm("Are you sure you want to clear all exclusions?"))
                     {
-                        _excludedIPs.Clear();
-                        _excludedHostnames.Clear();
-                        _excludedMACs.Clear();
-                        SaveExclusionsConfig();
+                        _uiState.ExcludedIPs.Clear();
+                        _uiState.ExcludedHostnames.Clear();
+                        _uiState.ExcludedMACs.Clear();
+                        _uiState.SaveExclusions();
                         AnsiConsole.MarkupLine("[yellow]All exclusions cleared[/]");
                         Thread.Sleep(1000);
                     }
@@ -2797,138 +2134,6 @@ public class MainApplication : IDisposable
         }
     }
 
-    private async Task ExportGraph()
-    {
-        RenderViewHeader("Export Options");
-
-        var exportChoices = new List<string> {
-            "DOT Graph (Graphviz format)",
-            "LaTeX/PDF Report (comprehensive analysis)",
-            "[yellow]« Cancel[/]"
-        };
-
-        var choice = PromptSelection("Choose export format:", exportChoices);
-
-        if (choice == null || choice.Contains("Cancel"))
-            return;
-
-        if (choice.StartsWith("DOT"))
-        {
-            await ExportDotGraph();
-        }
-        else if (choice.StartsWith("LaTeX"))
-        {
-            await ExportLatexReport();
-        }
-    }
-
-    private async Task ExportDotGraph()
-    {
-        try
-        {
-            var filename = AnsiConsole.Ask("Enter filename:", "network_graph.dot");
-
-            var dot = _graphService.ExportToDot();
-            await File.WriteAllTextAsync(filename, dot);
-
-            AnsiConsole.MarkupLine($"[green]✓ Graph exported to {filename}[/]");
-        }
-        catch (Exception ex)
-        {
-            AnsiConsole.MarkupLine($"[red]Export failed: {ex.Message}[/]");
-        }
-    }
-
-    private async Task ExportLatexReport()
-    {
-        try
-        {
-            var baseFilename = AnsiConsole.Ask("Enter base filename:", "network_report");
-
-            AnsiConsole.MarkupLine("[dim]Generating LaTeX report...[/]");
-
-            var reportData = await CollectReportData();
-
-            var latexService = new LatexReportService();
-            var (success, filePath, isPdf) = await latexService.ExportLatexReport(reportData, baseFilename);
-
-            if (!success)
-            {
-                AnsiConsole.MarkupLine("[red]✗ Report generation failed[/]");
-                return;
-            }
-
-            AnsiConsole.MarkupLine($"[green]✓ LaTeX file created: {baseFilename}.tex[/]");
-            AnsiConsole.MarkupLine($"[green]✓ DOT file created: {baseFilename}.dot[/]");
-
-            if (isPdf)
-            {
-                AnsiConsole.MarkupLine($"[green]✓ PDF generated successfully: {filePath}[/]");
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[cyan]Report includes:[/]");
-                AnsiConsole.MarkupLine($"  • {reportData.TotalDevices} devices analyzed");
-                AnsiConsole.MarkupLine($"  • {reportData.TotalConnections} connections documented");
-                AnsiConsole.MarkupLine("  • Network topology visualization");
-                AnsiConsole.MarkupLine("  • Statistical analysis");
-                AnsiConsole.MarkupLine("  • DOT graph export (separate file and appendix pages)");
-            }
-            else
-            {
-                AnsiConsole.MarkupLine("[yellow]⚠ pdflatex not found in PATH[/]");
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("To generate PDF, run:");
-                AnsiConsole.MarkupLine($"  pdflatex {baseFilename}.tex");
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("Or install LaTeX:");
-                AnsiConsole.MarkupLine("  Ubuntu/Debian: sudo apt install texlive-full");
-                AnsiConsole.MarkupLine("  macOS: brew install mactex");
-                AnsiConsole.MarkupLine("  Windows: Install MiKTeX or TeX Live");
-            }
-        }
-        catch (Exception ex)
-        {
-            AnsiConsole.MarkupLine($"[red]Export failed: {ex.Message}[/]");
-            Log.Error(ex, "LaTeX report export failed");
-        }
-    }
-
-    private async Task<ReportData> CollectReportData()
-    {
-        var devices = _graphService.GetAllDevices();
-        var connections = _graphService.GetAllConnections();
-        var peers = _peerService?.GetDiscoveredPeers() ?? new List<TLSPeer>();
-        var statistics = _graphService.GetStatistics();
-
-        var vertexCut = CalculateVertexCut(devices, connections);
-        var (mostConnectedDevice, mostConnectedCount) = GetMostConnectedDevice(devices, connections);
-
-        var sessionDuration = devices.Any()
-            ? DateTime.Now - devices.Min(d => d.FirstSeen)
-            : TimeSpan.Zero;
-
-        return await Task.FromResult(new ReportData
-        {
-            CurrentUser = _currentUser,
-            ReportGeneratedAt = DateTime.Now,
-            SessionDuration = sessionDuration,
-            NetworkInterface = _captureService.GetCurrentInterface() ?? "N/A",
-            IsCaptureRunning = _captureService.IsCapturing(),
-            Devices = devices,
-            Connections = connections,
-            Peers = peers,
-            Statistics = statistics,
-            VertexCut = vertexCut,
-            MostConnectedDevice = mostConnectedDevice,
-            MostConnectedCount = mostConnectedCount,
-            FilterConfig = _filterConfig,
-            ExcludedIPs = _excludedIPs,
-            ExcludedHostnames = _excludedHostnames,
-            ExcludedMACs = _excludedMACs,
-            DotGraphContent = _graphService.ExportToDot(),
-            ProtocolDistribution = _graphService.GetProtocolDistribution(),
-            PortDistribution = _graphService.GetPortDistribution()
-        });
-    }
 
     private async Task ShowLogs()
     {
@@ -3128,189 +2333,6 @@ public class MainApplication : IDisposable
         }
 
         Console.WriteLine();
-    }
-
-    private void ShowStatistics()
-    {
-        RenderViewHeader("Network Statistics & Topology Analysis");
-
-        var devices = _graphService.GetAllDevices();
-        var connections = _graphService.GetAllConnections();
-        var peers = _peerService?.GetDiscoveredPeers() ?? new List<TLSPeer>();
-
-        var totalPackets = devices.Sum(d => d.PacketCount);
-        var totalBytes = devices.Sum(d => d.BytesTransferred);
-        var activeDevices = devices.Count(d => d.IsActive);
-        var inactiveDevices = devices.Count - activeDevices;
-        var connectedPeers = peers.Count(p => p.IsConnected);
-        var activeConnections = connections.Count(c => c.IsActive);
-
-        var vertexCut = CalculateVertexCut(devices, connections);
-        var avgConnectionsPerDevice = devices.Count > 0 ? connections.Count / (double)devices.Count : 0;
-        var (mostConnectedDevice, mostConnectedCount) = GetMostConnectedDevice(devices, connections);
-
-        var gateways = devices.Where(d => d.IsGateway).ToList();
-        var defaultGateway = devices.FirstOrDefault(d => d.IsDefaultGateway);
-        var directL2Connections = connections.Count(c => c.Type == ConnectionType.DirectL2);
-        var routedL3Connections = connections.Count(c => c.Type == ConnectionType.RoutedL3);
-        var internetConnections = connections.Count(c => c.Type == ConnectionType.Internet);
-        var tlsPeerConnections = connections.Count(c => c.Type == ConnectionType.TLSPeer);
-        var connectionsWithTTL = connections.Where(c => c.AverageTTL.HasValue).ToList();
-        var avgTTL = connectionsWithTTL.Any() ? connectionsWithTTL.Average(c => c.AverageTTL!.Value) : 0;
-
-        var layoutMode = GetLayoutMode();
-
-        if (layoutMode == LayoutMode.TwoColumn)
-        {
-
-            var statsContent = new Grid()
-                .AddColumn()
-                .AddColumn()
-                .AddRow("[bold white]Device Statistics[/]", "")
-                .AddRow("[default]Total Devices:[/]", devices.Count.ToString())
-                .AddRow("[default]Active Devices:[/]", $"[green]{activeDevices}[/]")
-                .AddRow("[default]Inactive Devices:[/]", $"[dim]{inactiveDevices}[/]")
-                .AddRow("", "")
-                .AddRow("[bold white]Connection Statistics[/]", "")
-                .AddRow("[default]Total Connections:[/]", connections.Count.ToString())
-                .AddRow("[default]Active Connections:[/]", $"[green]{activeConnections}[/]")
-                .AddRow("[default]Avg Connections/Device:[/]", $"{avgConnectionsPerDevice:F2}")
-                .AddRow("", "")
-                .AddRow("[bold white]Traffic Statistics[/]", "")
-                .AddRow("[default]Total Packets:[/]", totalPackets.ToString("N0"))
-                .AddRow("[default]Total Bytes:[/]", FormatBytes(totalBytes))
-                .AddRow("", "")
-                .AddRow("[bold white]Peer Statistics[/]", "")
-                .AddRow("[default]TLS Peers Discovered:[/]", peers.Count.ToString())
-                .AddRow("[default]Connected Peers:[/]", $"[green]{connectedPeers}[/]")
-                .AddRow("", "")
-                .AddRow("[bold white]Topology Analysis[/]", "")
-                .AddRow("[default]Gateway Devices:[/]", gateways.Count.ToString())
-                .AddRow("[default]Default Gateway:[/]", defaultGateway != null
-                    ? $"[yellow]{defaultGateway.IPAddress}[/]"
-                    : "[dim]Not detected[/]")
-                .AddRow("[default]Direct L2 Connections:[/]", directL2Connections > 0 ? $"[green]{directL2Connections}[/]" : "0")
-                .AddRow("[default]Routed L3 Connections:[/]", routedL3Connections > 0 ? $"[cyan]{routedL3Connections}[/]" : "0")
-                .AddRow("[default]Internet Connections:[/]", internetConnections > 0 ? $"[blue]{internetConnections}[/]" : "0")
-                .AddRow("[default]TLS Peer Connections:[/]", tlsPeerConnections > 0 ? $"[green]{tlsPeerConnections}[/]" : "0")
-                .AddRow("[default]Avg TTL (tracked):[/]", connectionsWithTTL.Any() ? $"{avgTTL:F1}" : "N/A")
-                .AddRow("", "")
-                .AddRow("[bold white]Graph Analysis[/]", "")
-                .AddRow("[default]Vertex Cut (Min):[/]", vertexCut.ToString())
-                .AddRow("[default]Most Connected Node:[/]", mostConnectedDevice != null
-                    ? $"{mostConnectedDevice.Hostname ?? mostConnectedDevice.IPAddress} ({mostConnectedCount})"
-                    : "N/A")
-                .AddRow("[default]Capture Status:[/]",
-                    _captureService.IsCapturing() ? "[green]Running[/]" : "[yellow]Stopped[/]");
-
-            var topologyContent = RenderDirectedGraphContent(devices, connections);
-
-            var matrixContent = RenderConnectionMatrixContent(devices, connections);
-
-            var leftColumnGrid = new Grid()
-                .AddColumn();
-            leftColumnGrid.AddRow(new Markup("[bold white]Network Topology[/]"));
-            leftColumnGrid.AddRow(topologyContent);
-            leftColumnGrid.AddRow(new Text(""));
-            leftColumnGrid.AddRow(new Markup("[bold white]Connection Matrix[/]"));
-            leftColumnGrid.AddRow(matrixContent);
-
-            var unifiedTable = new Table()
-                .Border(TableBorder.Markdown)
-                .BorderColor(Color.Grey37)
-                .HideHeaders()
-                .Expand();
-
-            unifiedTable.AddColumn(new TableColumn(""));
-            unifiedTable.AddColumn(new TableColumn(""));
-
-            unifiedTable.AddRow(
-                leftColumnGrid,
-                statsContent
-            );
-
-            AnsiConsole.Write(unifiedTable);
-        }
-        else
-        {
-            var statsGrid = new Grid()
-                .AddColumn()
-                .AddColumn()
-                .AddRow("[bold]Devices[/]", "")
-                .AddRow("[default]Total:[/]", devices.Count.ToString())
-                .AddRow("[default]Active:[/]", $"[green]{activeDevices}[/]")
-                .AddRow("[default]Inactive:[/]", $"[dim]{inactiveDevices}[/]")
-                .AddRow("", "")
-                .AddRow("[bold]Connections[/]", "")
-                .AddRow("[default]Total:[/]", connections.Count.ToString())
-                .AddRow("[default]Active:[/]", $"[green]{activeConnections}[/]")
-                .AddRow("[default]Avg/Device:[/]", $"{avgConnectionsPerDevice:F2}")
-                .AddRow("", "")
-                .AddRow("[bold]Traffic[/]", "")
-                .AddRow("[default]Packets:[/]", totalPackets.ToString("N0"))
-                .AddRow("[default]Bytes:[/]", FormatBytes(totalBytes))
-                .AddRow("", "")
-                .AddRow("[bold]Topology[/]", "")
-                .AddRow("[default]Gateways:[/]", gateways.Count > 0 ? $"[yellow]{gateways.Count}[/]" : "0")
-                .AddRow("[default]L2/L3/Inet/Peer:[/]",
-                    $"{directL2Connections}/{routedL3Connections}/{internetConnections}/{tlsPeerConnections}")
-                .AddRow("[default]Avg TTL:[/]", connectionsWithTTL.Any() ? $"{avgTTL:F1}" : "N/A")
-                .AddRow("", "")
-                .AddRow("[bold]Graph[/]", "")
-                .AddRow("[default]Vertex Cut:[/]", vertexCut.ToString())
-                .AddRow("[default]Most Connected:[/]", mostConnectedDevice != null
-                    ? $"{mostConnectedDevice.Hostname ?? mostConnectedDevice.IPAddress}"
-                    : "N/A")
-                .AddRow("[default]Status:[/]",
-                    _captureService.IsCapturing() ? "[green]Running[/]" : "[yellow]Stopped[/]");
-
-            var statsPanel = new Panel(statsGrid)
-            {
-                Header = new PanelHeader("[default]Statistics[/]"),
-                Border = BoxBorder.Ascii
-            };
-
-            AnsiConsole.Write(statsPanel);
-            AnsiConsole.WriteLine();
-
-            var directedGraph = NetworkGraphUtility.RenderCompactDirectedGraph(devices, connections, _currentUser);
-            AnsiConsole.Write(directedGraph);
-            AnsiConsole.WriteLine();
-
-            var connectionMatrix = NetworkGraphUtility.RenderConnectionMatrix(devices, connections);
-            AnsiConsole.Write(connectionMatrix);
-        }
-
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[dim]Vertex Cut: Minimum nodes to remove to disconnect the network. Higher = better resilience.[/]");
-        AnsiConsole.MarkupLine($"[dim]Directed Graph: Connection flow with direction (↓inbound ↑outbound) and strength (→ weak ⇒ medium ⇛ strong).[/]");
-        AnsiConsole.MarkupLine($"[dim]Connection Matrix: Packet intensity heat map between devices (░ ▒ ▓ █).[/]");
-        AnsiConsole.MarkupLine($"[dim]Connection Types: L2=Direct Layer 2 (same segment), L3=Routed Layer 3 (via gateway), Inet=Internet, Peer=TLS Peer[/]");
-
-        AnsiConsole.WriteLine(); 
-    }
-
-    private void ShowFullscreenNetworkGraph()
-    {
-        RenderViewHeader("Network Topology Graph (Fullscreen)");
-
-        var devices = _graphService.GetAllDevices();
-        var connections = _graphService.GetAllConnections();
-
-        if (devices.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[yellow]No devices discovered yet.[/]");
-            return;
-        }
-
-        int availableHeight = Math.Max(20, Console.WindowHeight - 15);
-
-        var topologyContent = NetworkGraphUtility.RenderSimpleTopology(devices, connections, _currentUser, heightOverride: availableHeight, showAllDevices: true, windowWidth: _lastWindowWidth, isFullscreen: true);
-        AnsiConsole.Write(topologyContent);
-
-        AnsiConsole.MarkupLine($"[dim]Total Devices: [/][cyan]{devices.Count}[/][dim]  |  Connections: [/][cyan]{connections.Count}[/][dim]  |  TLS Peers: [/][green]{devices.Count(d => d.IsTLScopePeer)}[/]");
-
-        AnsiConsole.WriteLine();
     }
 
     /// <summary>
@@ -3520,70 +2542,6 @@ public class MainApplication : IDisposable
 
     #endregion
 
-    private void LoadExclusionsConfig()
-    {
-        try
-        {
-            if (File.Exists(ExclusionsConfigFile))
-            {
-                var json = File.ReadAllText(ExclusionsConfigFile);
-                var config = System.Text.Json.JsonSerializer.Deserialize<ExclusionsConfig>(json);
-
-                if (config != null)
-                {
-                    _excludedIPs = config.ExcludedIPs?.ToHashSet() ?? new();
-                    _excludedHostnames = config.ExcludedHostnames?.ToHashSet() ?? new();
-                    _excludedMACs = config.ExcludedMACs?.ToHashSet() ?? new();
-                    Log.Information($"Loaded exclusions: {_excludedIPs.Count} IPs, {_excludedHostnames.Count} hostnames, {_excludedMACs.Count} MACs");
-                }
-            }
-            else
-            {
-                SaveExclusionsConfig();
-                Log.Information("Created default exclusions config file");
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Warning($"Failed to load exclusions config: {ex.Message}");
-        }
-    }
-
-    private void SaveExclusionsConfig()
-    {
-        try
-        {
-            var config = new ExclusionsConfig
-            {
-                ExcludedIPs = _excludedIPs.ToList(),
-                ExcludedHostnames = _excludedHostnames.ToList(),
-                ExcludedMACs = _excludedMACs.ToList()
-            };
-
-            var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-            var json = System.Text.Json.JsonSerializer.Serialize(config, options);
-            File.WriteAllText(ExclusionsConfigFile, json);
-            Log.Information("Saved exclusions configuration");
-        }
-        catch (Exception ex)
-        {
-            Log.Warning($"Failed to save exclusions config: {ex.Message}");
-        }
-    }
-
-    private bool IsExcludedDevice(Device device)
-    {
-        if (!string.IsNullOrEmpty(device.IPAddress) && _excludedIPs.Contains(device.IPAddress))
-            return true;
-
-        if (!string.IsNullOrEmpty(device.Hostname) && _excludedHostnames.Contains(device.Hostname))
-            return true;
-
-        if (!string.IsNullOrEmpty(device.MACAddress) && _excludedMACs.Contains(device.MACAddress))
-            return true;
-
-        return false;
-    }
 
     private void OnDeviceDiscovered(object? sender, Device device)
     {
@@ -3595,7 +2553,7 @@ public class MainApplication : IDisposable
             Log.Debug($"Host device detected: {device.IPAddress} / {device.MACAddress}");
         }
 
-        if (IsExcludedDevice(device))
+        if (_uiState.IsExcluded(device))
         {
             Log.Debug($"Skipping excluded device: {device.IPAddress} / {device.Hostname}");
             return;
@@ -3618,7 +2576,7 @@ public class MainApplication : IDisposable
 
     private void OnConnectionDetected(object? sender, Connection connection)
     {
-        if (IsExcludedDevice(connection.SourceDevice) || IsExcludedDevice(connection.DestinationDevice))
+        if (_uiState.IsExcluded(connection.SourceDevice) || _uiState.IsExcluded(connection.DestinationDevice))
         {
             return;
         }
@@ -3727,11 +2685,11 @@ public class MainApplication : IDisposable
         var devices = _graphService.GetAllDevices();
         var connections = _graphService.GetAllConnections();
 
-        if (_filteredDevice != null)
+        if (_uiState.FilteredDevice != null)
         {
             connections = connections
-                .Where(c => c.SourceDevice.MACAddress == _filteredDevice.MACAddress ||
-                           c.DestinationDevice.MACAddress == _filteredDevice.MACAddress)
+                .Where(c => c.SourceDevice.MACAddress == _uiState.FilteredDevice.MACAddress ||
+                           c.DestinationDevice.MACAddress == _uiState.FilteredDevice.MACAddress)
                 .ToList();
         }
 
@@ -3842,20 +2800,16 @@ public class MainApplication : IDisposable
             return lines;
         }
 
-        var avatarLines = _userService.GetUserAvatar(_currentUser);
-
         var currentInterface = _captureService.GetCurrentInterface() ?? "None";
-
         var (localIP, localMAC) = GetLocalIPAndMAC();
-
         var sshKeyDisplay = GetSSHKeyDisplay(withMarkup: true);
 
-        var avatarColorHex = _currentUser.AvatarColor;
-
-        foreach (var line in avatarLines)
+        // Display SSH randomart instead of avatar
+        var randomartLines = SSHRandomart.GenerateRandomart(_currentUser.SSHPublicKey);
+        foreach (var line in randomartLines)
         {
             var escapedLine = line.Replace("[", "[[").Replace("]", "]]");
-            lines.Add($"[{avatarColorHex}]{escapedLine}[/]");
+            lines.Add($"[grey]{escapedLine}[/]");
         }
 
         lines.Add("");
@@ -3906,7 +2860,7 @@ public class MainApplication : IDisposable
                 var gateway = gateways[i];
                 var deviceName = GetDeviceName(gateway);
                 var (icon, color) = GetDeviceIconAndColor(gateway, connections);
-                var highlight = _highlightedDeviceMACs.Contains(gateway.MACAddress) ? "[yellow]★[/] " : "";
+                var highlight = _uiState.HighlightedDeviceMACs.Contains(gateway.MACAddress) ? "[yellow]★[/] " : "";
                 table.AddRow(
                     new Markup($"[{color}]  {icon} {highlight}{Markup.Escape(deviceName)}[/]"),
                     new Text(FormatNumber(gateway.PacketCount)),
@@ -3933,7 +2887,7 @@ public class MainApplication : IDisposable
                 var peer = peers[i];
                 var deviceName = GetDeviceName(peer);
                 var (icon, color) = GetDeviceIconAndColor(peer, connections);
-                var highlight = _highlightedDeviceMACs.Contains(peer.MACAddress) ? "[yellow]★[/] " : "";
+                var highlight = _uiState.HighlightedDeviceMACs.Contains(peer.MACAddress) ? "[yellow]★[/] " : "";
                 table.AddRow(
                     new Markup($"[{color}]  {icon} {highlight}{Markup.Escape(deviceName)}[/]"),
                     new Text(FormatNumber(peer.PacketCount)),
@@ -3960,7 +2914,7 @@ public class MainApplication : IDisposable
                 var device = activeLocal[i];
                 var deviceName = GetDeviceName(device);
                 var (icon, color) = GetDeviceIconAndColor(device, connections);
-                var highlight = _highlightedDeviceMACs.Contains(device.MACAddress) ? "[yellow]★[/] " : "";
+                var highlight = _uiState.HighlightedDeviceMACs.Contains(device.MACAddress) ? "[yellow]★[/] " : "";
                 table.AddRow(
                     new Markup($"[{color}]  {icon} {highlight}{Markup.Escape(deviceName)}[/]"),
                     new Text(FormatNumber(device.PacketCount)),
@@ -3987,7 +2941,7 @@ public class MainApplication : IDisposable
                 var device = activeRemote[i];
                 var deviceName = GetDeviceName(device);
                 var (icon, color) = GetDeviceIconAndColor(device, connections);
-                var highlight = _highlightedDeviceMACs.Contains(device.MACAddress) ? "[yellow]★[/] " : "";
+                var highlight = _uiState.HighlightedDeviceMACs.Contains(device.MACAddress) ? "[yellow]★[/] " : "";
                 table.AddRow(
                     new Markup($"[{color}]  {icon} {highlight}{Markup.Escape(deviceName)}[/]"),
                     new Text(FormatNumber(device.PacketCount)),
@@ -4014,7 +2968,7 @@ public class MainApplication : IDisposable
                 var device = inactive[i];
                 var deviceName = GetDeviceName(device);
                 var (icon, color) = GetDeviceIconAndColor(device, connections);
-                var highlight = _highlightedDeviceMACs.Contains(device.MACAddress) ? "[yellow]★[/] " : "";
+                var highlight = _uiState.HighlightedDeviceMACs.Contains(device.MACAddress) ? "[yellow]★[/] " : "";
                 table.AddRow(
                     new Markup($"[{color}]  {icon} {highlight}{Markup.Escape(deviceName)}[/]"),
                     new Text(FormatNumber(device.PacketCount)),
@@ -4280,18 +3234,6 @@ public class MainApplication : IDisposable
         return withMarkup ? $"[dim]{truncated}...[/]" : truncated;
     }
 
-    /// <summary>
-    /// Get avatar style for current user
-    /// </summary>
-    private Style GetAvatarStyle()
-    {
-        if (_currentUser == null)
-            return Style.Plain;
-
-        var avatarColor = AvatarUtility.HexToSpectreColor(_currentUser.AvatarColor);
-        return new Style(avatarColor);
-    }
-
     #endregion
 
     /// <summary>
@@ -4307,77 +3249,73 @@ public class MainApplication : IDisposable
             return emptyTable;
         }
 
-        var avatarLines = _userService.GetUserAvatar(_currentUser);
-        var avatarStyle = GetAvatarStyle();
-
         var (localIP, localMAC) = GetLocalIPAndMAC();
         var currentInterface = _captureService.GetCurrentInterface() ?? "None";
-
         var sshKeyDisplay = GetSSHKeyDisplay(withMarkup: false);
-
         var peers = _graphService.GetAllDevices().Count(d => d.IsTLScopePeer);
 
+        // Display only SSH randomart with user info
         var randomartLines = SSHRandomart.GenerateRandomart(_currentUser.SSHPublicKey ?? "");
 
         var table = new Table()
             .Border(TableBorder.None)
             .HideHeaders()
-            .AddColumn(new TableColumn("").Padding(0, 0, 6, 0))  // Avatar + Info column with right padding
+            .AddColumn(new TableColumn("").Padding(0, 0, 6, 0))  // Info column with right padding
             .AddColumn(new TableColumn("").Width(19)); // SSH art column (17 chars + 2 border)
 
         table.AddRow(
-            new Text(avatarLines[0], avatarStyle),
-            new Markup($"[default]{Markup.Escape(randomartLines[0])}[/]")
-        );
-
-        table.AddRow(
-            new Text(avatarLines[1], avatarStyle),
-            new Markup($"[default]{Markup.Escape(randomartLines[1])}[/]")
-        );
-
-        table.AddRow(
-            new Text(avatarLines[2], avatarStyle),
-            new Markup($"[default]{Markup.Escape(randomartLines[2])}[/]")
-        );
-
-        table.AddRow(
-            new Text(avatarLines[3], avatarStyle),
-            new Markup($"[default]{Markup.Escape(randomartLines[3])}[/]")
-        );
-
-        table.AddRow(
-            new Text(""),
-            new Markup($"[default]{Markup.Escape(randomartLines[4])}[/]")
-        );
-
-        table.AddRow(
             new Markup($"[bold]User:[/] {Markup.Escape(_currentUser.Username)}"),
-            new Markup($"[default]{Markup.Escape(randomartLines[5])}[/]")
+            new Markup($"[grey]{Markup.Escape(randomartLines[0])}[/]")
         );
 
         table.AddRow(
             new Markup($"[dim]SSH:[/] {Markup.Escape(sshKeyDisplay)}..."),
-            new Markup($"[default]{Markup.Escape(randomartLines[6])}[/]")
+            new Markup($"[grey]{Markup.Escape(randomartLines[1])}[/]")
         );
 
         table.AddRow(
             new Markup($"[dim]Interface:[/] [cyan]{Markup.Escape(currentInterface)}[/]"),
-            new Markup($"[default]{Markup.Escape(randomartLines[7])}[/]")
+            new Markup($"[grey]{Markup.Escape(randomartLines[2])}[/]")
         );
 
         table.AddRow(
             new Markup($"[dim]IP:[/] {Markup.Escape(localIP)}"),
-            new Markup($"[default]{Markup.Escape(randomartLines[8])}[/]")
+            new Markup($"[grey]{Markup.Escape(randomartLines[3])}[/]")
         );
 
         table.AddRow(
             new Markup($"[dim]MAC:[/] {Markup.Escape(localMAC)}"),
-            new Markup($"[default]{Markup.Escape(randomartLines[9])}[/]")
+            new Markup($"[grey]{Markup.Escape(randomartLines[4])}[/]")
         );
 
         table.AddRow(
             new Markup($"[dim]Status:[/] [green]Active[/] | [dim]Peers:[/] {peers}"),
-            new Markup($"[default]{Markup.Escape(randomartLines[10])}[/]")
+            new Markup($"[grey]{Markup.Escape(randomartLines[5])}[/]")
+        );
+
+        table.AddRow(
+            new Text(""),
+            new Markup($"[grey]{Markup.Escape(randomartLines[6])}[/]")
+        );
+
+        table.AddRow(
+            new Text(""),
+            new Markup($"[grey]{Markup.Escape(randomartLines[7])}[/]")
+        );
+
+        table.AddRow(
+            new Text(""),
+            new Markup($"[grey]{Markup.Escape(randomartLines[8])}[/]")
+        );
+
+        table.AddRow(
+            new Text(""),
+            new Markup($"[grey]{Markup.Escape(randomartLines[9])}[/]")
+        );
+
+        table.AddRow(
+            new Text(""),
+            new Markup($"[grey]{Markup.Escape(randomartLines[10])}[/]")
         );
 
         return table;
@@ -4448,43 +3386,27 @@ public class MainApplication : IDisposable
             };
         }
 
-        var avatarLines = _userService.GetUserAvatar(_currentUser);
-
         var currentInterface = _captureService.GetCurrentInterface() ?? "None";
-
         var (localIP, localMAC) = GetLocalIPAndMAC();
-
         var sshKeyDisplay = GetSSHKeyDisplay(withMarkup: true);
-        var avatarStyle = GetAvatarStyle();
+
+        // Display SSH randomart instead of avatar
+        var randomartLines = SSHRandomart.GenerateRandomart(_currentUser.SSHPublicKey);
 
         var grid = new Grid();
-        grid.AddColumn(new GridColumn().Width(9));  // Avatar width
-        grid.AddColumn(new GridColumn().Width(5));  // Spacing
         grid.AddColumn(new GridColumn().NoWrap());  // Info
 
-        grid.AddRow(
-            new Text(avatarLines[0], avatarStyle),
-            new Text(""),
-            new Markup($"user: [bold]{_currentUser.Username}[/]")
-        );
+        grid.AddRow(new Markup($"user: [bold]{_currentUser.Username}[/]"));
+        grid.AddRow(new Markup($"ssh: {sshKeyDisplay}"));
+        grid.AddRow(new Markup($"interface: [cyan]{currentInterface}[/]"));
+        grid.AddRow(new Markup($"ip: [dim]{localIP}[/] | mac: [dim]{localMAC}[/]"));
+        grid.AddRow(new Text(""));
 
-        grid.AddRow(
-            new Text(avatarLines[1], avatarStyle),
-            new Text(""),
-            new Markup($"ssh: {sshKeyDisplay}")
-        );
-
-        grid.AddRow(
-            new Text(avatarLines[2], avatarStyle),
-            new Text(""),
-            new Markup($"interface: [cyan]{currentInterface}[/]")
-        );
-
-        grid.AddRow(
-            new Text(avatarLines[3], avatarStyle),
-            new Text(""),
-            new Markup($"ip: [dim]{localIP}[/] | mac: [dim]{localMAC}[/]")
-        );
+        // Add SSH randomart
+        foreach (var line in randomartLines)
+        {
+            grid.AddRow(new Markup($"[grey]{Markup.Escape(line)}[/]"));
+        }
 
         return new Panel(grid)
         {
@@ -4761,12 +3683,3 @@ public class MainApplication : IDisposable
 
 }
 
-/// <summary>
-/// Configuration for excluded devices (IPs, hostnames, MACs that should be filtered out)
-/// </summary>
-public class ExclusionsConfig
-{
-    public List<string> ExcludedIPs { get; set; } = new();
-    public List<string> ExcludedHostnames { get; set; } = new();
-    public List<string> ExcludedMACs { get; set; } = new();
-}

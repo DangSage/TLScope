@@ -33,10 +33,6 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Email).IsRequired().HasMaxLength(100);
             entity.Property(e => e.PasswordHash).IsRequired();
             entity.Property(e => e.SSHPublicKey).HasMaxLength(1000);
-            entity.Property(e => e.AvatarType).HasMaxLength(50);
-            entity.Property(e => e.AvatarColor).HasMaxLength(7);
-            entity.Property(e => e.CustomAvatarLinesStorage).HasMaxLength(200);
-            entity.Ignore(e => e.CustomAvatarLines);
         });
 
         // Device configuration

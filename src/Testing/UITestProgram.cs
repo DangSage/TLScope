@@ -56,9 +56,7 @@ public class UITestProgram
         {
             Username = "ui-tester",
             Email = "tester@tlscope.local",
-            SSHPublicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... tester@tlscope",
-            AvatarType = "APPEARANCE_DEFAULT",
-            AvatarColor = "#4ECDC4"
+            SSHPublicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC... tester@tlscope"
         };
 
         var mockCapture = new MockPacketCaptureService();

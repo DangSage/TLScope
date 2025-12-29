@@ -24,9 +24,7 @@ public class UITestHarness
         {
             Username = "test-user",
             Email = "test@tlscope.local",
-            SSHPublicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... test@tlscope",
-            AvatarType = "ROBOT",
-            AvatarColor = "#4ECDC4"
+            SSHPublicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC... test@tlscope"
         };
 
         _mockCaptureService = new MockPacketCaptureService();

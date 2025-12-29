@@ -168,8 +168,6 @@ public class TlsPeerService : ITlsPeerService
                 Type = MSG_TYPE_DISCOVERY,
                 Username = _localUser.Username,
                 SSHPublicKey = _localUser.SSHPublicKey,
-                AvatarType = _localUser.AvatarType,
-                AvatarColor = _localUser.AvatarColor,
                 CombinedRandomartAvatar = combinedArtString,
                 Port = TLS_PORT,
                 Version = "1.0.0"
@@ -208,8 +206,6 @@ public class TlsPeerService : ITlsPeerService
                 Type = MSG_TYPE_DISCOVERY,
                 Username = _localUser.Username,
                 SSHPublicKey = _localUser.SSHPublicKey,
-                AvatarType = _localUser.AvatarType,
-                AvatarColor = _localUser.AvatarColor,
                 CombinedRandomartAvatar = combinedArtString,
                 Port = TLS_PORT,
                 Version = "1.0.0"
@@ -252,8 +248,7 @@ public class TlsPeerService : ITlsPeerService
                 // Parse peer info
                 var username = message["Username"].GetString() ?? "Unknown";
                 var sshKey = message["SSHPublicKey"].GetString() ?? "";
-                var avatarType = message["AvatarType"].GetString() ?? "APPEARANCE_DEFAULT";
-                var avatarColor = message["AvatarColor"].GetString() ?? "#FFFFFF";
+                // Backward compatibility: ignore avatar data if present in old peer messages
                 var combinedArt = message.ContainsKey("CombinedRandomartAvatar") ? message["CombinedRandomartAvatar"].GetString() : null;
                 var port = message.ContainsKey("Port") ? message["Port"].GetInt32() : TLS_PORT;
                 var version = message.ContainsKey("Version") ? message["Version"].GetString() : "1.0.0";
@@ -268,8 +263,6 @@ public class TlsPeerService : ITlsPeerService
                     IPAddress = result.RemoteEndPoint.Address.ToString(),
                     Port = port,
                     SSHPublicKey = sshKey,
-                    AvatarType = avatarType,
-                    AvatarColor = avatarColor,
                     CombinedRandomartAvatar = combinedArt,
                     Version = version,
                     FirstSeen = DateTime.UtcNow
@@ -475,8 +468,6 @@ public class TlsPeerService : ITlsPeerService
                 ["Type"] = MSG_TYPE_PEER_IDENTIFICATION,
                 ["Username"] = _localUser.Username,
                 ["SSHPublicKey"] = _localUser.SSHPublicKey,
-                ["AvatarType"] = _localUser.AvatarType,
-                ["AvatarColor"] = _localUser.AvatarColor,
                 ["CombinedRandomartAvatar"] = combinedArtString,
                 ["Signature"] = signature
             };
@@ -628,24 +619,17 @@ public class TlsPeerService : ITlsPeerService
     }
 
     /// <summary>
-    /// Get avatar lines for local user (custom or predefined)
+    /// Get placeholder for combined art (avatars removed, using SSH randomart only)
     /// </summary>
     private string[] GetLocalUserAvatar()
     {
-        // Check if user has custom avatar lines
-        if (_localUser.CustomAvatarLines != null && _localUser.CustomAvatarLines.Length == 4)
+        // Return empty placeholder since avatars have been removed
+        return new[]
         {
-            return _localUser.CustomAvatarLines;
-        }
-
-        // Fall back to predefined avatar
-        var avatar = AvatarUtility.GetAvatar(_localUser.AvatarType);
-        return avatar?.Appearance ?? new[]
-        {
-            "   o   ",
-            "./\\|/\\.",
-            "( o.o )",
-            " > ^ < "
+            "         ",
+            "         ",
+            "         ",
+            "         "
         };
     }
 

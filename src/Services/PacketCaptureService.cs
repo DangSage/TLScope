@@ -589,6 +589,15 @@ public class PacketCaptureService : IPacketCaptureService
             return null;
         }
 
+        // Virtual devices should only be created for external/remote IPs
+        // Local IPs with filtered MACs (broadcast/multicast) should not become virtual devices
+        if (IPAddressValidator.IsLocalAddress(ipAddress))
+        {
+            Log.Debug($"[VIRTUAL-DEVICE] Skipping virtual device creation for local IP: {ipAddress}");
+            Log.Debug($"[VIRTUAL-DEVICE] Local IPs should have real MAC addresses. This IP likely has a broadcast/multicast MAC.");
+            return null;
+        }
+
         // Filter non-local IP addresses if enabled
         if (_filterConfig.FilterNonLocalTraffic && !IPAddressValidator.IsLocalAddress(ipAddress))
         {
@@ -698,43 +707,12 @@ public class PacketCaptureService : IPacketCaptureService
 
     /// <summary>
     /// Classify connection type based on destination device and TTL
-    /// TTL analysis:
-    /// - >= 62: DirectL2 (initial TTL 64 - 1-2 hops, same L2 segment)
-    /// - 50-61: RoutedL3 (routed through local gateway)
-    /// - < 50: Internet (multiple hops, likely remote)
+    /// Uses smart initial TTL detection and hop counting for accurate classification
     /// </summary>
     private ConnectionType ClassifyConnectionType(Device destinationDevice, int ttl)
     {
-        // If destination is a virtual device (remote host), it's Internet
-        if (destinationDevice.IsVirtualDevice)
-        {
-            return ConnectionType.Internet;
-        }
-
-        // If destination is local, analyze TTL
-        if (destinationDevice.IsLocal)
-        {
-            if (ttl >= 62)
-            {
-                // High TTL suggests direct L2 connection
-                // Common initial TTLs: 64 (Linux), 128 (Windows), 255 (network devices)
-                // After 1-2 hops: 62-63, 126-127, 253-254
-                return ConnectionType.DirectL2;
-            }
-            else if (ttl >= 50)
-            {
-                // Medium TTL suggests routing through local gateway
-                return ConnectionType.RoutedL3;
-            }
-            else
-            {
-                // Low TTL even for local device - unusual, treat as Internet
-                return ConnectionType.Internet;
-            }
-        }
-
-        // Destination is not local (public IP), it's Internet
-        return ConnectionType.Internet;
+        // Use shared classification logic from ConnectionClassifier
+        return ConnectionClassifier.ClassifyConnection(destinationDevice, ttl);
     }
 
     /// <summary>

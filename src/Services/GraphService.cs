@@ -169,10 +169,29 @@ public class GraphService : IGraphService
         // Check if edge already exists
         if (_graph.TryGetEdge(source, destination, out var existingEdge))
         {
-            // Update existing connection
+            // Update existing connection statistics
             existingEdge.Tag.LastSeen = connection.LastSeen;
             existingEdge.Tag.PacketCount += connection.PacketCount;
             existingEdge.Tag.BytesTransferred += connection.BytesTransferred;
+
+            // Update TTL statistics if new TTL data is available
+            if (connection.AverageTTL.HasValue && connection.PacketCountForTTL > 0)
+            {
+                ConnectionClassifier.UpdateTTLStatistics(
+                    existingEdge.Tag,
+                    connection.AverageTTL.Value,
+                    connection.PacketCountForTTL
+                );
+
+                // Reclassify connection type based on updated TTL
+                var newType = ConnectionClassifier.ClassifyConnection(existingEdge.Tag);
+                if (existingEdge.Tag.Type != newType)
+                {
+                    existingEdge.Tag.Type = newType;
+                    Log.Debug($"Connection type updated: {existingEdge.Tag} -> {newType}");
+                }
+            }
+
             return;
         }
 
@@ -681,42 +700,12 @@ public class GraphService : IGraphService
     /// <summary>
     /// Classify connection type for an existing connection
     /// Used to update connection types after topology changes
+    /// Uses smart TTL detection with hop counting for accurate classification
     /// </summary>
     public ConnectionType ClassifyConnection(Connection connection)
     {
-        // TLS peer connections always stay as TLSPeer
-        if (connection.IsTLSPeerConnection)
-            return ConnectionType.TLSPeer;
-
-        // If we have TTL data, use it
-        if (connection.AverageTTL.HasValue)
-        {
-            var dest = connection.DestinationDevice;
-
-            if (dest.IsVirtualDevice)
-                return ConnectionType.Internet;
-
-            if (dest.IsLocal)
-            {
-                if (connection.AverageTTL >= 62)
-                    return ConnectionType.DirectL2;
-                else if (connection.AverageTTL >= 50)
-                    return ConnectionType.RoutedL3;
-                else
-                    return ConnectionType.Internet;
-            }
-
-            return ConnectionType.Internet;
-        }
-
-        // Fallback: classify based on device properties only
-        if (connection.DestinationDevice.IsVirtualDevice)
-            return ConnectionType.Internet;
-
-        if (connection.DestinationDevice.IsLocal)
-            return ConnectionType.DirectL2; // Assume direct if no TTL data
-
-        return ConnectionType.Internet;
+        // Use shared classification logic from ConnectionClassifier
+        return ConnectionClassifier.ClassifyConnection(connection);
     }
 
     /// <summary>

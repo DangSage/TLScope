@@ -2602,6 +2602,12 @@ public class MainApplication : IDisposable
     {
         AddLogMessage($"Gateway detected: {gateway.IPAddress} ({gateway.GatewayRole})");
 
+        // Reclassify all connection types now that we know the gateway
+        // This ensures connections are correctly classified as DirectL2 vs RoutedL3
+        Log.Information($"[TOPOLOGY] Reclassifying connection types after gateway detection...");
+        _graphService.UpdateConnectionTypes();
+        Log.Information($"[TOPOLOGY] Connection types updated");
+
         lock (_refreshLock)
         {
             _dashboardNeedsRefresh = true;
